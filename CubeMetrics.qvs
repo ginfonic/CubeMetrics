@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(data_dir)/cbm_element.xlsx', '$(data_dir)/cbm_stuff.xlsx', '$(refs_dir)/gosbs.xlsx');
+	call cbmCreateModel('$(data_dir)/cbm_element.xlsx', '$(data_dir)/cbm_stuff.xlsx', '$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(refs_dir)/gosbs.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -11,7 +11,402 @@ sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, gosbs)
+sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
+	// Загружает Лешины таблицы
+	cbm_inic_cancel:
+	noconcatenate load *,
+		iniccnl.tb_code&iniccnl.gosb_code as org_code;
+	noconcatenate load
+		id as iniccnl.id,
+		comment as iniccnl.comment,
+		parent_id as iniccnl.parent_id,
+		DIRECTION as iniccnl.DIRECTION,
+		GOSB as iniccnl.GOSB,
+		If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as iniccnl.gosb_code,
+		TB as iniccnl.TB,
+		tb_code as iniccnl.tb_code,
+		type as iniccnl.type,
+		title as iniccnl.title,
+		indicator as iniccnl.indicator,
+		essence as iniccnl.essence,
+		Date(Date#(control_date, 'DD-MM-YYYY') ) as iniccnl.control_date,
+		Date(Date#(create_date, 'DD-MM-YYYY') ) as iniccnl.create_date,
+		STATUS as iniccnl.STATUS,
+		If(id = 7635, 
+			Date('31-03-2022','DD-MM-YYYY'), 
+			Date(Date#(left(comment, 10),'DD-MM-YYYY'))
+		) as iniccnl.comment_date,
+		If(Upper(STATUS) = 'ЗАВЕРШЕНА', 
+			If(Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4,
+				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
+				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
+			), 
+			Year(Now())
+		) as iniccnl.year_report
+	from [$(tasks_qvd)] (qvd)
+	where  (STATUS = 'Отменена') and (parent_id = 0) and (DIRECTION = 'Бизнес идеи (КРП)');
+
+	Hierarchy(inic.id, inic.parent_id, inic.title)
+	cbm_inic:
+	noconcatenate load *,
+		inic.tb_code&inic.gosb_code as org_code;
+	noconcatenate load
+		tb_code&gosb_code&focus_ter as inic.CityID,
+		id as inic.id,
+		comment as inic.comment,
+		parent_id as inic.parent_id,
+		//++//
+		If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as inic.DIRECTION,
+		//++//
+		GOSB as inic.GOSB,
+		If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as inic.gosb_code,
+		TB as inic.TB,
+		tb_code as inic.tb_code,
+		type as inic.type,
+		title as inic.title,
+		indicator as inic.indicator,
+		essence as inic.essence,
+		OWNER as inic.owner,
+		Date(Date#(control_date, 'DD-MM-YYYY')) as inic.control_date,
+		Date(Date#(create_date, 'DD-MM-YYYY')) as inic.create_date,
+		Date(Date#(update_date, 'DD-MM-YYYY')) as inic.update_date,
+		Date(Date#(close_date, 'DD-MM-YYYY')) as inic.close_date,
+		Num(Date(Date#(control_date, 'DD-MM-YYYY'))) as inic.control_date_num,
+		CREATOR as inic.fio,
+		STATUS as inic.STATUS,
+		confirm_status as inic.confirm_status,
+		//++//
+		If((id = 7635) and (Upper(STATUS) <> 'ОТМЕНЕНА'), 
+			Date('31-03-2022','DD-MM-YYYY'), 
+			Date(Date#(left(comment, 10),'DD-MM-YYYY'))
+		) as inic.comment_date, 
+		//++//
+		BETTER_PRACTICE as inic.BETTER_PRACTICE,
+		focus_link_type as inic.focus_link_type,
+		focus_ter as inic.focus_ter,
+		assigned_ca as inic.assigned_ca,
+		direction_id as inic.direction_id,
+		Year(Date#(create_date, 'DD-MM-YYYY')) as inic.create_date_year,
+		Len(title) as inic.title_len,
+		esg as inic.esg,
+		focus_upr as inic.focus_upr,
+		If(Upper(STATUS) <> 'ОТМЕНЕНА', plan_effect) as inic.plan_effect,
+		If(Upper(STATUS) <> 'ОТМЕНЕНА', actually_effect) as inic.actually_effect,
+		//++//
+		If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
+			If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
+				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
+				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
+			), 
+			Year(Now())
+		) as inic.year_report,
+		//++//
+		city as inic.city,
+		products as inic.products,
+		industry as inic.industry,
+		SubStringCount(products, ';') as inic.countproduct,
+		SubStringCount(products, 'Цифровая платформа;') as inic.product_platf,
+		project_group as inic.project_group,
+		alarm as inic.alarm,
+		cause as inic.cause,
+		vsp as inic.vsp, 
+		object as inic.object, 
+		texttype as inic.texttype, 
+		id_template as inic.id_template, 
+		alarm_create_date as inic.alarm_create_date, 
+		alarm_close_date as inic.alarm_close_date,
+		ppr as inic.ppr,
+		If(object = 'ВСП', 
+			'Физ. сеть', 
+			If((DIRECTION = 'Запуск сервисов B2C') and (products = 'еАптека;') and (Len(object) = 0), 'Хаб')
+		) as inic.eApteka,
+		If((DIRECTION = 'Региональные проекты') or (DIRECTION = 'Big Idea') or (DIRECTION = 'Проекты Core-бизнеса'), 1, 0) as inic.3in1,
+		If((DIRECTION = 'Бизнес-эксперименты') or (DIRECTION = 'КРП'), 1, 0) as inic.2in1
+	from [$(tasks_qvd)] (qvd)
+	where (parent_id = 0) and ((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
+
+	//////////////////////////////////////////////////////////////////////////////////
+	// Метрики
+	cbm_metrics_lookup:
+	noconcatenate load * Inline [
+		MetrID, MetrID_name, MetrID_direct, MetrID_plan
+		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
+		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
+		10000017, Доля нереализованных идей КРП, 2, 0
+		10000018, Достаточность КПР для выполнения плана, 1, 1
+		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
+		10000020, Низкое количество идей КРП на ГОСБ, 1, 2
+  ];
+
+	// Команда
+	cbm_stuff:
+
+	//METRIC_ID=MetrID
+
+	//METRIC_NAME=MetrID_name
+
+	//TB_ID=if(org_tb_code<>38,org_tb_code)
+
+	//GOSB_ID=pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //2
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //3
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //4
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //5
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //6
+	// ''
+	// )
+
+	// METRIC_VALUE
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// num(($(eInicKRPCount))/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
+	// //2
+	// count({<    
+	// 		[inic.STATUS]={'В работе'},
+	// 		[inic.DIRECTION]={'Бизнес идеи (КРП)'},
+	// 		[inic.year_report]={'2023'},
+	// 		[inic.control_date]={"<02.02.2024"},
+	// 		[inic.create_date]={"<$(vTod1m)"} 
+	// 		>}inic.id),
+	// //3
+	// num(count({<    
+	// 		[iniccnl.STATUS] ={'Отменена'}, 
+	// 		[iniccnl.DIRECTION]={'Бизнес идеи (КРП)'},
+	// 		[iniccnl.year_report]={'2023'},
+	// 		[iniccnl.control_date]={"<02.02.2024"}
+	// 		>}iniccnl.id)/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
+	// //4
+	// num(count({<    
+	// 		[inic.STATUS]={'Завершена', 'В работе'},
+	// 			[inic.DIRECTION]={'КРП'},
+	// 				[inic.year_report]={'2023'},
+	// 				[inic.control_date]={"<02.02.2024"}
+	// 			>}[inic.id])/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0')
+	// ,
+	// //5
+	// num(count({<    
+	// 		[inic.STATUS]={'Завершена', 'В работе'},
+	// 			[inic.DIRECTION]={'КРП', 'Бизнес идеи (КРП)'},
+	// 				[inic.year_report]={'2023'},
+	// 				[inic.control_date]={">02.02.2024<02.02.2025"}
+	// 			>}[inic.id])/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
+	// //6
+	// num(count({<    
+	// 		[inic.STATUS]={'Завершена', 'В работе'},
+	// 			[inic.DIRECTION]={'КРП', 'Бизнес идеи (КРП)'},
+	// 				[inic.year_report]={'2023'},
+	// 				[inic.control_date]={"<02.02.2024"} 
+	// 			>}[inic.id])/
+	// 			count(org_gosb_code), '0,0')
+	// )       
+
+	// METRIC_PLAN_VALUE
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// num(1.5,'0,0'),
+	// //2
+	// 0,
+	// //3
+	// 0,
+	// //4
+	// num(1.0,'0,0'),
+	// //5
+	// num(0.7,'0,0'),
+	// //6
+	// ''
+	// )
+
+	// REPORT_DATE=today()
+
+	// COMMENT
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// '1)	Количество идей КРП на текущий год '&
+	// 						count({<
+	// 															[inic.DIRECTION]={'Бизнес идеи (КРП)'},
+	// 															[inic.STATUS]={'В работе'},
+	// 															[inic.year_report]={'2023'},
+	// 															[inic.control_date]={"<02.02.2024"}
+	// 															>}
+	// 																[inic.title])&' шт.'&chr(13)&
+	// '2)	Количество КРП, реализуемых в текущем году '&
+	// 							count({<
+	// 															[inic.DIRECTION]={'КРП'},
+	// 															[inic.STATUS]={'В работе'},
+	// 															[inic.year_report]={'2023'},
+	// 															[inic.control_date]={"<02.02.2024"}
+	// 															>}
+	// 																[inic.title])&' шт.'&chr(13)&
+	// '3)	Ориентир КРП на текущий год '& pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ),4,3,2,1) &' шт.',
+	// //2
+	// '',
+	// //3
+	// '',
+	// //4
+	// '1)	Количество КРП, реализуемых в текущем году '&
+	// 						count({<
+	// 															[inic.DIRECTION]={'КРП'},
+	// 															[inic.STATUS]={'В работе'},
+	// 															[inic.year_report]={'2023'},
+	// 															[inic.control_date]={"<02.02.2024"}
+	// 															>}
+	// 																[inic.title])&' шт.'&chr(13)&
+	// '2)	Количество КРП завершенных в текущем году '&
+	// 							count({<
+	// 															[inic.DIRECTION]={'КРП'},
+	// 															[inic.STATUS]={'Завершена'},
+	// 															[inic.year_report]={'2023'},
+	// 															[inic.control_date]={"<02.02.2024"}
+	// 															>}
+	// 																[inic.title])&' шт.'&chr(13)&
+	// '3)	Ориентир КРП на текущий год '& pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ),4,3,2,1) &' шт.',
+	// //5
+	// '1)	количество идей КРП на следующий год '&
+	// 	count({<    
+	// 		[inic.STATUS]={'В работе'},
+	// 			[inic.DIRECTION]={'Бизнес идеи (КРП)'},
+	// 				[inic.year_report]={'2023'},
+	// 				[inic.control_date]={">02.02.2024<02.02.2025"}
+	// 			>}[inic.id])&' (шт.)'&chr(13)&
+	// '2)	количество КРП, реализуемых в следующем году '&
+	// 	count({<    
+	// 		[inic.STATUS]={'В работе'},
+	// 			[inic.DIRECTION]={'КРП'},
+	// 				[inic.year_report]={'2023'},
+	// 				[inic.control_date]={">02.02.2024<02.02.2025"}
+	// 			>}[inic.id])&' (шт.)'&chr(13)&
+	// '3)	план КРП на текущий год '&pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ),4,3,2,1)&' (шт.) (считаем, что план на следующий год равен текущему)',
+			
+	// //6
+	// '1)	Количество идей КРП на текущий год: '&
+	// 						count({<
+	// 															[inic.DIRECTION]={'Бизнес идеи (КРП)'},
+	// 															[inic.STATUS]={'Завершена', 'В работе'},
+	// 															[inic.year_report]={'2023'},
+	// 															[inic.control_date]={"<02.02.2024"}
+	// 															>}
+	// 																[inic.title])&' шт.'&chr(13)&
+	// '2)	Количество КРП в текущем году в статусе реализуется и завершена: '&
+	// 						count({<
+	// 															[inic.DIRECTION]={'КРП'},
+	// 															[inic.STATUS]={'Завершена', 'В работе'},
+	// 															[inic.year_report]={'2023'},
+	// 															[inic.control_date]={"<02.02.2024"}
+	// 															>}
+	// 																[inic.title])&' шт.'&chr(13)&
+	// '3)	ГОСБ: '&count(org_gosb_code) &' шт.'
+	// )
+
+	// STRUCT_LEVEL='STUFF'
+
+	// METRIC_DIRECT=MetrID_direct
+
+	// Команда
+	cbm_element:
+
+	//METRIC_ID=MetrID
+
+	//METRIC_NAME=MetrID_name
+
+	//TB_ID=if(org_tb_code<>38,org_tb_code)
+
+	//GOSB_ID=pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //2
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //3
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //4
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //5
+	// if(org_gosb_code<>9052,org_gosb_code),
+	// //6
+	// ''
+	// )
+
+	// METRIC_VALUE
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// ' ',
+	// //2
+	// ' ',
+	// //3
+	// ' ',
+	// //4
+	// ' ',
+	// //5
+	// ' ',
+	// //6
+	// ' '
+	// )
+
+	// METRIC_PLAN_VALUE
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// ' ',
+	// //2
+	// ' ',
+	// //3
+	// ' ',
+	// //4
+	// ' ',
+	// //5
+	// ' ',
+	// //6
+	// ' '
+	// )
+
+	// REPORT_DATE=today()
+
+	// COMMENT
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// ' ',
+	// //2
+	// ' ',
+	// //3
+	// ' ',
+	// //4
+	// ' ',
+	// //5
+	// ' ',
+	// //6
+	// ' '
+	// )
+
+	// STRUCT_LEVEL='ELEMENT'
+
+	// DEV_ELEMENT_NAME
+	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// //1
+	// if(([inic.DIRECTION]='Бизнес идеи (КРП)' or [inic.DIRECTION]='КРП')  and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена' )and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
+	// [inic.DIRECTION]&': '&[inic.title]&', срок: '&[inic.control_date]&', статус: '&[inic.STATUS]),
+	// //2
+	// if([inic.DIRECTION]='Бизнес идеи (КРП)' and [inic.STATUS]='В работе' and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024') and [inic.create_date]< date('$(vTod1m)'),
+	// [inic.title]&', дата создания: '&[inic.create_date]&' (в ожидании '&(today()-[inic.create_date]) &' дн.)' ),
+	// //3
+	// if( [iniccnl.DIRECTION]='Бизнес идеи (КРП)' and [iniccnl.STATUS]='Отменена' and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
+	// [iniccnl.DIRECTION]&': '&[iniccnl.title]&', срок: '&[iniccnl.control_date]&', статус: '&[iniccnl.STATUS]),
+	// //4
+	// if( [inic.DIRECTION]='КРП' and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена') and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
+	// [inic.DIRECTION]&': '&[inic.title]&', срок: '&[inic.control_date]&', статус: '&[inic.STATUS]),
+	// //5
+
+	// if(([inic.DIRECTION]='Бизнес идеи (КРП)' or [inic.DIRECTION]='КРП')  and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена' ) and [inic.year_report]='2023' and  ([inic.control_date]>date('02.02.2024') and [inic.control_date]<date('02.02.2025')) ,
+	// [inic.DIRECTION]&': '&[inic.title]&', срок: '&[inic.control_date]&', статус: '&[inic.STATUS]),
+	// //6  
+	// ' '
+	// )
+
+	//////////////////////////////////////////////////////////////////////////////////
+
 	// Получает элементы
 	if '$(cbmConnection)' = '1' then
 		//QVD
