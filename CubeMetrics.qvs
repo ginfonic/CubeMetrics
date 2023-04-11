@@ -1,0 +1,218 @@
+﻿//CubeMetrics
+//Сохраняет модель данных в QVD
+sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
+	let cbmConnection = use_db;
+	call cbmCreateModel('$(data_dir)/cbm_element.xlsx', '$(data_dir)/cbm_stuff.xlsx', '$(refs_dir)/gosbs.xlsx');
+	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	call storeTemp('cbm_data', target&'_data');
+	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	drop table cbm_data;
+  $(mExitSubOnStepError);
+end sub;
+
+//Создает модель данных
+sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, gosbs)
+	// Получает элементы
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_data:
+		noconcatenate load
+			METRIC_ID,
+			METRIC_NAME,
+			TB_ID,
+			GOSB_ID,
+			METRIC_VALUE as METRIC_VALUE_1,
+			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+			REPORT_DATE as REPORT_DATE_1,
+			STRUCT_LEVEL,
+			DEV_ELEMENT_NAME
+		from [$(cbm_element_xl)] (qvd);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		cbm_data:
+		noconcatenate load
+			METRIC_ID,
+			METRIC_NAME,
+			TB_ID,
+			GOSB_ID,
+			METRIC_VALUE as METRIC_VALUE_1,
+			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+			REPORT_DATE as REPORT_DATE_1,
+			STRUCT_LEVEL,
+			DEV_ELEMENT_NAME
+		from [$(cbm_element_xl)] (ooxml, embedded labels, table is Sheet1);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	// Получает команду
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		concatenate(cbm_data) load
+			METRIC_ID,
+			METRIC_NAME,
+			TB_ID,
+			GOSB_ID,
+			METRIC_VALUE as METRIC_VALUE_1,
+			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+			REPORT_DATE as REPORT_DATE_1,
+			"COMMENT" as DEV_ELEMENT_NAME,
+			STRUCT_LEVEL,
+			METRIC_DIRECT as METRIC_DIRECT_1
+		from [$(cbm_stuff_xl)] (qvd);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		concatenate(cbm_data) load
+			METRIC_ID,
+			METRIC_NAME,
+			TB_ID,
+			GOSB_ID,
+			METRIC_VALUE as METRIC_VALUE_1,
+			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+			REPORT_DATE as REPORT_DATE_1,
+			"COMMENT" as DEV_ELEMENT_NAME,
+			STRUCT_LEVEL,
+			METRIC_DIRECT as METRIC_DIRECT_1
+		from [$(cbm_stuff_xl)] (ooxml, embedded labels, table is Sheet1);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	// Расчитывает значение перцентилей 0,75 и 0,25
+	left join(cbm_data) load
+		METRIC_ID,
+		Fractile(METRIC_VALUE_1, 0.75) as PERCENTILE75,
+		Fractile(METRIC_VALUE_1, 0.25) as PERCENTILE25
+	resident cbm_data
+	where (
+		(STRUCT_LEVEL = 'STUFF') and 
+		(
+			((METRIC_ID = 10000015) and (METRIC_VALUE_1 >= 1.5)) or 
+			((METRIC_ID = 10000017) and (METRIC_VALUE_1 > 0)) or 
+			((METRIC_ID = 10000018) and (METRIC_VALUE_1 >= 1)) or 
+			((METRIC_ID = 10000019) and (METRIC_VALUE_1 >= 0.7)) or
+			(METRIC_ID = 10000020)
+		)
+	)
+	group by METRIC_ID;
+
+	// Выражения расчета необходимых дат
+	set cbmGetPrevMStart = MonthStart(AddMonths(REPORT_DATE_1, -1));
+	set cbmGetPrevMEnd = MonthEnd(AddMonths(REPORT_DATE_1, -1));
+	set cbmGetPrevQStart = QuarterStart(AddMonths(REPORT_DATE_1, -3));
+	set cbmGetPrevQEnd = QuarterEnd(AddMonths(REPORT_DATE_1, -3));
+
+	temp:
+	noconcatenate load *,
+	// Добавляет пустые и стандартные поля
+	'' as ELEMENT_TYPE, 
+	'' as ELEMENT_ID,
+	'EXT_FILE' as SEGMENT ,
+	// Добавляет поле LOAD_ID из метрики и даты отчета
+	If((METRIC_ID = 10000018) or (METRIC_ID = 10000019),
+		METRIC_ID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
+		METRIC_ID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
+	) as LOAD_ID, 
+	// Рассчитывает поле DEVIATION_MARKER
+	If(not $(ggffIsEmpty(METRIC_VALUE_1)),
+		Pick(Match(METRIC_ID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+			// 10000015
+			If(METRIC_VALUE_1 < 1.5, 
+				1, 
+				If(METRIC_VALUE_1 >= PERCENTILE75,
+					13,
+					0
+				)
+			),
+			// 10000016
+			If(METRIC_VALUE_1 > 0, 1, 0), 
+			// 10000017
+			If(METRIC_VALUE_1 = 0, 
+				13, 
+				If(METRIC_VALUE_1 >= PERCENTILE75,
+					1,
+					0
+				)
+			),
+			// 10000018
+			If(METRIC_VALUE_1 < 1, 
+				1, 
+				If(METRIC_VALUE_1 >= PERCENTILE75,
+					13,
+					0
+				)
+			),
+			// 10000019
+			If(METRIC_VALUE_1 < 0.7, 
+				1, 
+				If(METRIC_VALUE_1 >= PERCENTILE75,
+					13,
+					0
+				)
+			),
+			// 10000020
+			If(METRIC_VALUE_1 >= PERCENTILE75, 
+				13, 
+				If(METRIC_VALUE_1 <= PERCENTILE25,
+					1,
+					0
+				)
+			))
+		) as DEVIATION_MARKER_1,
+	Date(Floor($(cbmGetPrevMEnd))) as REPORT_DATE,
+	TB_ID&GOSB_ID as ORG_CODE
+	resident cbm_data;
+	drop table cbm_data;
+	rename table temp to cbm_data;
+	drop fields PERCENTILE75, PERCENTILE25, REPORT_DATE_1;
+
+	//Получает справочник ГОСБ
+	gosbs:
+	noconcatenate load 0 as gosb.TB autogenerate(0);
+	call ggffGetGOSBs(0, '$(gosbs)', '', 'gosbs');
+
+	//Добавляет параметры ГОСБ
+	left join(cbm_data) load
+		// gosb.TBCode as TB_ID,
+		// gosb.GOSBCode as GOSB_ID,
+		gosb.OrgCode as ORG_CODE,
+		gosb.TB as TB_NAME,
+		gosb.GOSB as GOSB_NAME
+	resident gosbs;
+	drop table gosbs;
+
+	// Заполняет пустые поля из таблицы Elements данными из Stuff
+	left join(cbm_data) load 
+		REPORT_DATE,
+		ORG_CODE,
+		METRIC_ID,
+		Max(METRIC_VALUE_1) as METRIC_VALUE,
+		Max(METRIC_PLAN_VALUE_1) as METRIC_PLAN_VALUE,
+		Max(METRIC_DIRECT_1) as METRIC_DIRECT,
+		Max(DEVIATION_MARKER_1) as DEVIATION_MARKER
+	resident cbm_data
+	group by REPORT_DATE, ORG_CODE, METRIC_ID;
+	drop fields METRIC_VALUE_1, METRIC_PLAN_VALUE_1, METRIC_DIRECT_1, DEVIATION_MARKER_1, ORG_CODE;
+
+	//Сохраняет таблицы
+	for I=15 to 20
+		cbm_data_$(I):
+		noconcatenate load * resident cbm_data where METRIC_ID = '100000'&$(I);
+		store cbm_data_$(I) into [lib://Data/cbm_out_$(I).csv] (TXT);
+		drop table cbm_data_$(I);
+	next;
+end sub;
+
+//Создает переменные и выражения
+sub cbmSetVariables
+	//Переменные
+	let vOrgCode = 99;
+end sub;
