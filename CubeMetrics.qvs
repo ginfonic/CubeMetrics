@@ -13,45 +13,70 @@ end sub;
 //Создает модель данных
 sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, org_xlsx)
 	// Загружает Лешины таблицы
-	cbm_inic_cancel:
-	noconcatenate load
-		tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-		id as iniccnl.id,
-		DIRECTION as iniccnl.DIRECTION,
-		title as iniccnl.title,
-		Date(Date#(control_date, 'DD-MM-YYYY') ) as iniccnl.control_date,
-		Date(Date#(create_date, 'DD-MM-YYYY') ) as iniccnl.create_date,
-		STATUS as iniccnl.STATUS,
-		If(Upper(STATUS) = 'ЗАВЕРШЕНА', 
-			If(Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4,
-				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
-				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
-			), 
-			Year(Now())
-		) as iniccnl.year_report
-	from [$(tasks_qvd)] (qvd)
-	where (parent_id = 0) and (STATUS = 'Отменена') and (DIRECTION = 'Бизнес идеи (КРП)');
-
+	
+	// Таблица инициатив
 	cbm_inic:
 	noconcatenate load
 		tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-		id as inic.id,
-		If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as inic.DIRECTION,
-		title as inic.title,
-		Date(Date#(control_date, 'DD-MM-YYYY')) as inic.control_date,
-		Date(Date#(create_date, 'DD-MM-YYYY')) as inic.create_date,
-		STATUS as inic.STATUS,
+		id as inic.ID,
+		If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as inic.Direction,
+		title as inic.Title,
+		Date(Date#(control_date, 'DD-MM-YYYY')) as inic.ControlDate,
+		Date(Date#(create_date, 'DD-MM-YYYY')) as inic.CreateDate,
+		STATUS as inic.Status,
 		If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
 			If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
 				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
 				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
 			), 
 			Year(Now())
-		) as inic.year_report
+		) as inic.YearReport
 	from [$(tasks_qvd)] (qvd)
 	where (parent_id = 0) and ((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
+
+	// Таблица отмененных инициатив
+	cbm_inic_cancel:
+	noconcatenate load
+		tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
+		id as inic.ID,
+		DIRECTION as inic.Direction,
+		title as inic.Title,
+		Date(Date#(control_date, 'DD-MM-YYYY') ) as inic.ControlDate,
+		Date(Date#(create_date, 'DD-MM-YYYY') ) as inic.CreateDate,
+		STATUS as inic.Status,
+		Year(Now()) as inic.YearReport
+	from [$(tasks_qvd)] (qvd)
+	where (parent_id = 0) and (Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
  
-	//Оргкоды
+	// Шаблон метрик
+	cbm_metrics_lookup:
+	noconcatenate load * Inline [
+		inic.MetricID, inic.MetricTitle, inic.MetrDirection, inic.MetricPlan
+		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
+		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
+		10000017, Доля нереализованных идей КРП, 2, 0
+		10000018, Достаточность КПР для выполнения плана, 1, 1
+		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
+		10000020, Низкое количество идей КРП на ГОСБ, 1, 2
+  ];
+
+	// Добавляет метрики к таблице инициатив
+	join(cbm_inic) load * 
+	resident cbm_metrics_lookup
+	where inic.MetricID <> 10000017;
+
+	// Добавляет метрики к таблице отменненных инициатив
+	join(cbm_inic_cancel) load * 
+	resident cbm_metrics_lookup
+	where inic.MetricID = 10000017;
+	drop table cbm_metrics_lookup;
+
+	// Сливает таблицу отмененных инициатив с таблицей инициатив
+	concatenate(cbm_inic) load *
+	resident cbm_inic_cancel;
+	drop table cbm_inic_cancel;
+
+	// Загружает таблицу оргкодов
 	if '$(cbmConnection)' = '1' then
 		//QVD
 		org:
@@ -68,40 +93,29 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		org:
 		noconcatenate load distinct 
 			org_code,
-			org_tb_code,
-			org_gosb_code,
-			org_tb_name,
-			org_gosb_name,
-			org_cluster
+			$(ggffT2N(org_tb_code)) as org_tb_code,
+			$(ggffT2N(org_gosb_code)) as org_gosb_code,
+			$(ggffT2N(org_tb_name)) as org_tb_name,
+			$(ggffT2N(org_gosb_name)) as org_gosb_name,
+			$(ggffT2N(org_cluster)) as org_cluster
 		from [$(org_xlsx)] (ooxml, embedded labels, table is Sheet1);
 	end if;
 
-	left join (cbm_inic_cancel) load
-		org_code,
-		org_tb_code as iniccnl.TBCode,
-		org_gosb_code as iniccnl.GOSBCode,
-		org_cluster as iniccnl.Cluster
-	resident org;
-
-	left join (cbm_inic_cancel) load
+	// Добавляет данные и таблицы оргкодов к таблице инициатив
+	left join (cbm_inic) load
 		org_code,
 		org_tb_code as inic.TBCode,
 		org_gosb_code as inic.GOSBCode,
 		org_cluster as inic.Cluster
 	resident org;
 
-	//////////////////////////////////////////////////////////////////////////////////
-	// Метрики
-	cbm_metrics_lookup:
-	noconcatenate load * Inline [
-		MetrID, MetrID_name, MetrID_direct, MetrID_plan
-		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
-		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
-		10000017, Доля нереализованных идей КРП, 2, 0
-		10000018, Достаточность КПР для выполнения плана, 1, 1
-		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
-		10000020, Низкое количество идей КРП на ГОСБ, 1, 2
-  ];
+	//
+	temp:
+	noconcatenate load * 
+	resident cbm_inic 
+	where (org_code <> 3838) and (org_code <> 529052);
+	drop table cbm_inic;
+	rename table temp to cbm_inic;
 
 	// Команда
 	// cbm_stuff:
@@ -564,13 +578,13 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	group by REPORT_DATE, ORG_CODE, METRIC_ID;
 	drop fields METRIC_VALUE_1, METRIC_PLAN_VALUE_1, METRIC_DIRECT_1, DEVIATION_MARKER_1, ORG_CODE;
 
-	//Сохраняет таблицы
-	for I=15 to 20
-		cbm_data_$(I):
-		noconcatenate load * resident cbm_data where METRIC_ID = '100000'&$(I);
-		store cbm_data_$(I) into [lib://Data/cbm_out_$(I).csv] (TXT);
-		drop table cbm_data_$(I);
-	next;
+	// //Сохраняет таблицы
+	// for I=15 to 20
+	// 	cbm_data_$(I):
+	// 	noconcatenate load * resident cbm_data where METRIC_ID = '100000'&$(I);
+	// 	store cbm_data_$(I) into [lib://Data/cbm_out_$(I).csv] (TXT);
+	// 	drop table cbm_data_$(I);
+	// next;
 end sub;
 
 //Создает переменные и выражения
