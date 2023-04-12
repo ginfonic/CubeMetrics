@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(data_dir)/cbm_element.xlsx', '$(data_dir)/cbm_stuff.xlsx', '$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(refs_dir)/gosbs.xlsx');
+	call cbmCreateModel('$(data_dir)/cbm_element.xlsx', '$(data_dir)/cbm_stuff.xlsx', '$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', , '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -11,31 +11,17 @@ sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
+sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, org_xlsx)
 	// Загружает Лешины таблицы
 	cbm_inic_cancel:
-	noconcatenate load *,
-		iniccnl.tb_code&iniccnl.gosb_code as org_code;
 	noconcatenate load
+		tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
 		id as iniccnl.id,
-		comment as iniccnl.comment,
-		parent_id as iniccnl.parent_id,
 		DIRECTION as iniccnl.DIRECTION,
-		GOSB as iniccnl.GOSB,
-		If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as iniccnl.gosb_code,
-		TB as iniccnl.TB,
-		tb_code as iniccnl.tb_code,
-		type as iniccnl.type,
 		title as iniccnl.title,
-		indicator as iniccnl.indicator,
-		essence as iniccnl.essence,
 		Date(Date#(control_date, 'DD-MM-YYYY') ) as iniccnl.control_date,
 		Date(Date#(create_date, 'DD-MM-YYYY') ) as iniccnl.create_date,
 		STATUS as iniccnl.STATUS,
-		If(id = 7635, 
-			Date('31-03-2022','DD-MM-YYYY'), 
-			Date(Date#(left(comment, 10),'DD-MM-YYYY'))
-		) as iniccnl.comment_date,
 		If(Upper(STATUS) = 'ЗАВЕРШЕНА', 
 			If(Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4,
 				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
@@ -44,86 +30,65 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
 			Year(Now())
 		) as iniccnl.year_report
 	from [$(tasks_qvd)] (qvd)
-	where  (STATUS = 'Отменена') and (parent_id = 0) and (DIRECTION = 'Бизнес идеи (КРП)');
+	where (parent_id = 0) and (STATUS = 'Отменена') and (DIRECTION = 'Бизнес идеи (КРП)');
 
-	Hierarchy(inic.id, inic.parent_id, inic.title)
 	cbm_inic:
-	noconcatenate load *,
-		inic.tb_code&inic.gosb_code as org_code;
 	noconcatenate load
-		tb_code&gosb_code&focus_ter as inic.CityID,
+		tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
 		id as inic.id,
-		comment as inic.comment,
-		parent_id as inic.parent_id,
-		//++//
 		If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as inic.DIRECTION,
-		//++//
-		GOSB as inic.GOSB,
-		If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as inic.gosb_code,
-		TB as inic.TB,
-		tb_code as inic.tb_code,
-		type as inic.type,
 		title as inic.title,
-		indicator as inic.indicator,
-		essence as inic.essence,
-		OWNER as inic.owner,
 		Date(Date#(control_date, 'DD-MM-YYYY')) as inic.control_date,
 		Date(Date#(create_date, 'DD-MM-YYYY')) as inic.create_date,
-		Date(Date#(update_date, 'DD-MM-YYYY')) as inic.update_date,
-		Date(Date#(close_date, 'DD-MM-YYYY')) as inic.close_date,
-		Num(Date(Date#(control_date, 'DD-MM-YYYY'))) as inic.control_date_num,
-		CREATOR as inic.fio,
 		STATUS as inic.STATUS,
-		confirm_status as inic.confirm_status,
-		//++//
-		If((id = 7635) and (Upper(STATUS) <> 'ОТМЕНЕНА'), 
-			Date('31-03-2022','DD-MM-YYYY'), 
-			Date(Date#(left(comment, 10),'DD-MM-YYYY'))
-		) as inic.comment_date, 
-		//++//
-		BETTER_PRACTICE as inic.BETTER_PRACTICE,
-		focus_link_type as inic.focus_link_type,
-		focus_ter as inic.focus_ter,
-		assigned_ca as inic.assigned_ca,
-		direction_id as inic.direction_id,
-		Year(Date#(create_date, 'DD-MM-YYYY')) as inic.create_date_year,
-		Len(title) as inic.title_len,
-		esg as inic.esg,
-		focus_upr as inic.focus_upr,
-		If(Upper(STATUS) <> 'ОТМЕНЕНА', plan_effect) as inic.plan_effect,
-		If(Upper(STATUS) <> 'ОТМЕНЕНА', actually_effect) as inic.actually_effect,
-		//++//
 		If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
 			If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
 				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
 				Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
 			), 
 			Year(Now())
-		) as inic.year_report,
-		//++//
-		city as inic.city,
-		products as inic.products,
-		industry as inic.industry,
-		SubStringCount(products, ';') as inic.countproduct,
-		SubStringCount(products, 'Цифровая платформа;') as inic.product_platf,
-		project_group as inic.project_group,
-		alarm as inic.alarm,
-		cause as inic.cause,
-		vsp as inic.vsp, 
-		object as inic.object, 
-		texttype as inic.texttype, 
-		id_template as inic.id_template, 
-		alarm_create_date as inic.alarm_create_date, 
-		alarm_close_date as inic.alarm_close_date,
-		ppr as inic.ppr,
-		If(object = 'ВСП', 
-			'Физ. сеть', 
-			If((DIRECTION = 'Запуск сервисов B2C') and (products = 'еАптека;') and (Len(object) = 0), 'Хаб')
-		) as inic.eApteka,
-		If((DIRECTION = 'Региональные проекты') or (DIRECTION = 'Big Idea') or (DIRECTION = 'Проекты Core-бизнеса'), 1, 0) as inic.3in1,
-		If((DIRECTION = 'Бизнес-эксперименты') or (DIRECTION = 'КРП'), 1, 0) as inic.2in1
+		) as inic.year_report
 	from [$(tasks_qvd)] (qvd)
 	where (parent_id = 0) and ((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
+ 
+	//Оргкоды
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		org:
+		noconcatenate load distinct 
+			org_code,
+			org_tb_code,
+			org_gosb_code,
+			org_tb_name,
+			org_gosb_name,
+			org_cluster
+		from [$(org_qvd)] (qvd);
+	else
+		//Excel
+		org:
+		noconcatenate load distinct 
+			org_code,
+			org_tb_code,
+			org_gosb_code,
+			org_tb_name,
+			org_gosb_name,
+			org_cluster
+		from [$(org_xlsx)] (ooxml, embedded labels, table is Sheet1);
+	end if;
+
+	left join (cbm_inic_cancel) load
+		org_code,
+		org_tb_code as iniccnl.TBCode,
+		org_gosb_code as iniccnl.GOSBCode,
+		org_cluster as iniccnl.Cluster
+	resident org;
+
+	left join (cbm_inic_cancel) load
+		org_code,
+		org_tb_code as inic.TBCode,
+		org_gosb_code as inic.GOSBCode,
+		org_cluster as inic.Cluster
+	resident org;
 
 	//////////////////////////////////////////////////////////////////////////////////
 	// Метрики
@@ -139,7 +104,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
   ];
 
 	// Команда
-	cbm_stuff:
+	// cbm_stuff:
 
 	//METRIC_ID=MetrID
 
@@ -165,14 +130,21 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
 	// METRIC_VALUE
 	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
 	// //1
-	// num(($(eInicKRPCount))/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
+	// num(
+	// count({<    
+	// 	[inic.STATUS]={'Завершена', 'В работе'},
+	// 	[inic.DIRECTION]={'КРП', 'Бизнес идеи (КРП)','Бизнес-эксперименты'},
+	// 	[inic.year_report]={'2023'},
+	// 	[inic.control_date]={"<02.02.2024"}
+	// >}[inic.id]))/
+	// (pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
 	// //2
 	// count({<    
 	// 		[inic.STATUS]={'В работе'},
 	// 		[inic.DIRECTION]={'Бизнес идеи (КРП)'},
 	// 		[inic.year_report]={'2023'},
 	// 		[inic.control_date]={"<02.02.2024"},
-	// 		[inic.create_date]={"<$(vTod1m)"} 
+	// 		[inic.create_date]={"<date(today()-60)"} 
 	// 		>}inic.id),
 	// //3
 	// num(count({<    
@@ -308,7 +280,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
 	// METRIC_DIRECT=MetrID_direct
 
 	// Команда
-	cbm_element:
+	// cbm_element:
 
 	//METRIC_ID=MetrID
 
@@ -392,7 +364,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
 	// if([inic.DIRECTION]='Бизнес идеи (КРП)' and [inic.STATUS]='В работе' and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024') and [inic.create_date]< date('$(vTod1m)'),
 	// [inic.title]&', дата создания: '&[inic.create_date]&' (в ожидании '&(today()-[inic.create_date]) &' дн.)' ),
 	// //3
-	// if( [iniccnl.DIRECTION]='Бизнес идеи (КРП)' and [iniccnl.STATUS]='Отменена' and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
+	// if( [iniccnl.DIRECTION]='Бизнес идеи (КРП)' and [iniccnl.STATUS]='Отменена' and [iniccnl.year_report]='2023' and [iniccnl.control_date]< date('02.02.2024'),
 	// [iniccnl.DIRECTION]&': '&[iniccnl.title]&', срок: '&[iniccnl.control_date]&', статус: '&[iniccnl.STATUS]),
 	// //4
 	// if( [inic.DIRECTION]='КРП' and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена') and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
@@ -569,20 +541,15 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, gosbs)
 	rename table temp to cbm_data;
 	drop fields PERCENTILE75, PERCENTILE25, REPORT_DATE_1;
 
-	//Получает справочник ГОСБ
-	gosbs:
-	noconcatenate load 0 as gosb.TB autogenerate(0);
-	call ggffGetGOSBs(0, '$(gosbs)', '', 'gosbs');
-
 	//Добавляет параметры ГОСБ
 	left join(cbm_data) load
 		// gosb.TBCode as TB_ID,
 		// gosb.GOSBCode as GOSB_ID,
-		gosb.OrgCode as ORG_CODE,
-		gosb.TB as TB_NAME,
-		gosb.GOSB as GOSB_NAME
-	resident gosbs;
-	drop table gosbs;
+		org_code as ORG_CODE,
+		org_tb_name as TB_NAME,
+		org_gosb_name as GOSB_NAME
+	resident org;
+	drop table org;
 
 	// Заполняет пустые поля из таблицы Elements данными из Stuff
 	left join(cbm_data) load 
