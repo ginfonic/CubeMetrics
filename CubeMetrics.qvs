@@ -51,7 +51,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	// Шаблон метрик
 	cbm_metrics_lookup:
 	noconcatenate load * Inline [
-		inic.MetricID, inic.MetricTitle, inic.MetrDirection, inic.MetricPlan
+		inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlan
 		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
 		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
@@ -101,15 +101,13 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		from [$(org_xlsx)] (ooxml, embedded labels, table is Sheet1);
 	end if;
 
-	// Добавляет данные и таблицы оргкодов к таблице инициатив
+	// Добавляет кластер из таблицы оргкодов к таблице инициатив
 	left join (cbm_inic) load
 		org_code,
-		org_tb_code as inic.TBCode,
-		org_gosb_code as inic.GOSBCode,
 		org_cluster as inic.Cluster
 	resident org;
 
-	//
+	// Убирает Москву и Крым
 	temp:
 	noconcatenate load * 
 	resident cbm_inic 
@@ -118,256 +116,234 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	rename table temp to cbm_inic;
 
 	// Команда
-	// cbm_stuff:
+	cbm_stuff:
+	noconcatenate load 
+		org_code,
+		inic.MetricID as stuff.MetricID,
+		inic.MetricTitle as stuff.MetricTitle,
+		// inic.TBCode as stuff.TBCode,
+		// If(inic.MetricID <> 10000020, inic.GOSBCode) as stuff.GOSBCode,
+		// stuff.MetricValue,
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as stuff.MetricPlanValue,
+		Today() as stuff.ReportDate,
+		// stuff.Comment,
+		'STUFF' as stuff.StructLevel,
+		inic.MetricDirection as stuff.MetricDirection,
+		'' as stuff.DevElementTitle,
+		// Вспомогательные поля
+		inic.Cluster as stuff.Cluster,
+		inic.ID as stuff.ID,
+		inic.Direction as stuff.Direction,
+		inic.Title as stuff.Title,
+		inic.ControlDate as stuff.ControlDate,
+		inic.CreateDate as stuff.CreateDate,
+		inic.Status as stuff.Status,
+		inic.YearReport as stuff.YearReport
+	resident cbm_inic;
 
-	//METRIC_ID=MetrID
+	// Элемент
+	cbm_elem:
+	noconcatenate load 
+		org_code,
+		inic.MetricID as elem.MetricID,
+		inic.MetricTitle as elem.MetricTitle,
+		// inic.TBCode as elem.TBCode,
+		// If(inic.MetricID <> 10000020, inic.GOSBCode) as elem.GOSBCode,
+		// elem.MetricValue,
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as elem.MetricPlanValue,
+		Today() as elem.ReportDate,
+		'' as elem.Comment,
+		'ELEMENT' as elem.StructLevel,
+		inic.MetricDirection as elem.MetricDirection,
+		// elem.DevElementTitle,
+		// Вспомогательные поля
+		inic.Cluster as elem.Cluster,
+		inic.ID as elem.ID,
+		inic.Direction as elem.Direction,
+		inic.Title as elem.Title,
+		inic.ControlDate as elem.ControlDate,
+		inic.CreateDate as elem.CreateDate,
+		inic.Status as elem.Status,
+		inic.YearReport as elem.YearReport
+	resident cbm_inic;
 
-	//METRIC_NAME=MetrID_name
+	// Объединенная
+	temp:
+	noconcatenate load 
+		org_code,
+		inic.MetricID,
+		inic.MetricTitle,
+		// inic.MetricValue,
+		// Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as inic.MetricPlanValue,
+		// Today() as inic.ReportDate,
+		// inic.Comment,
+		'ELEMENT' as inic.StructLevel,
+		inic.MetricDirection,
+		// inic.DevElementTitle,
+		// Вспомогательные поля
+		inic.Cluster,
+		inic.ID,
+		inic.Direction,
+		inic.Title,
+		inic.ControlDate,
+		inic.CreateDate,
+		inic.Status,
+		inic.YearReport
+	resident cbm_inic;
+	drop table cbm_inic;
+	rename table temp to cbm_inic;
 
-	//TB_ID=if(org_tb_code<>38,org_tb_code)
+	// Знаменатель, исходя из кластера ГОСБ
+	set cbmGetClusterMilestone = Pick(Match(inic.Cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4') + 1, 1, 4, 3, 2, 1);
 
-	//GOSB_ID=pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //2
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //3
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //4
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //5
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //6
-	// ''
-	// )
+	// Группирует по ГОСБ с кластером, метрике и получает аггрегаты
+	left join(cbm_inic) load
+		org_code, 
+		inic.Cluster,
+		inic.MetricID,
+		// Значение метрики
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),
+			//10000015
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'Бизнес-эксперименты')) and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) /
+			$(cbmGetClusterMilestone),
+			//10000016
+			Count(If(
+				(inic.Status = 'В работе') and
+				(inic.Direction = 'Бизнес идеи (КРП)') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024') and 
+				(inic.CreateDate = Date(Today() - 60)),
+				inic.ID
+			)),
+			//10000017
+			Count(If(
+				(inic.Status = 'Отменена') and
+				(inic.Direction = 'Бизнес идеи (КРП)') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) /
+			$(cbmGetClusterMilestone),
+			//10000018
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				(inic.Direction = 'КРП') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) /
+			$(cbmGetClusterMilestone),
+			//10000019
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
+				(inic.YearReport = 2023) and
+				((inic.ControlDate >= '02.02.2024') or (inic.ControlDate < '02.02.2025')),
+				inic.ID
+			)) /
+			$(cbmGetClusterMilestone),
+			//10000020
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) /
+			// Считает только коды ГОСБ
+			Count(If(Len(org_code) > 2, org_code))
+		) as inic.MetricValue,
+		// Комментарий
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),
+			//10000015
+			'1)	Количество идей КРП на текущий год: ' &
+			Count(If(
+				(inic.Status = 'В работе') and
+				(inic.Direction = 'Бизнес идеи (КРП)') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'2)	Количество КРП, реализуемых в текущем году: ' &
+			Count(If(
+				(inic.Status = 'В работе') and
+				(inic.Direction = 'КРП') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
+			//10000016
+			Null(),
+			//10000017
+			Null(),
+			//10000018
+			'1)	Количество КРП, реализуемых в текущем году: ' &
+			Count(If(
+				(inic.Status = 'В работе') and
+				(inic.Direction = 'КРП') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'2)	Количество КРП завершенных в текущем году: ' &
+			Count(If(
+				(inic.Status = 'Завершена') and
+				(inic.Direction = 'КРП') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
+			//10000019
+			'1)	Количество идей КРП на следующий год: ' &
+			Count(If(
+				(inic.Status = 'В работе') and
+				(inic.Direction = 'Бизнес идеи (КРП)') and
+				(inic.YearReport = 2023) and
+				((inic.ControlDate >= '02.02.2024') or (inic.ControlDate < '02.02.2025')),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'2)	Количество КРП, реализуемых в следующем году: ' &
+			Count(If(
+				(inic.Status = 'В работе') and
+				(inic.Direction = 'КРП') and
+				(inic.YearReport = 2023) and
+				((inic.ControlDate >= '02.02.2024') or (inic.ControlDate < '02.02.2025')),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'3)	План КРП на текущий год: ' & 
+			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)',
+			//10000020
+			'1)	Количество идей КРП на текущий год: ' &
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				(inic.Direction = 'Бизнес идеи (КРП)') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'2)	Количество КРП в текущем году в статусе реализуется и завершена: '&
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				(inic.Direction = 'КРП') and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) & ' шт. '& chr(13) &
+			'3)	ГОСБ: ' & 
+			Count(If(Len(org_code) > 2, org_code)) & ' шт.'
+		) as inic.Comment
+	resident cbm_inic
+	group by org_code, inic.MetricID, inic.Cluster;
 
-	// METRIC_VALUE
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// num(
-	// count({<    
-	// 	[inic.STATUS]={'Завершена', 'В работе'},
-	// 	[inic.DIRECTION]={'КРП', 'Бизнес идеи (КРП)','Бизнес-эксперименты'},
-	// 	[inic.year_report]={'2023'},
-	// 	[inic.control_date]={"<02.02.2024"}
-	// >}[inic.id]))/
-	// (pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
-	// //2
-	// count({<    
-	// 		[inic.STATUS]={'В работе'},
-	// 		[inic.DIRECTION]={'Бизнес идеи (КРП)'},
-	// 		[inic.year_report]={'2023'},
-	// 		[inic.control_date]={"<02.02.2024"},
-	// 		[inic.create_date]={"<date(today()-60)"} 
-	// 		>}inic.id),
-	// //3
-	// num(count({<    
-	// 		[iniccnl.STATUS] ={'Отменена'}, 
-	// 		[iniccnl.DIRECTION]={'Бизнес идеи (КРП)'},
-	// 		[iniccnl.year_report]={'2023'},
-	// 		[iniccnl.control_date]={"<02.02.2024"}
-	// 		>}iniccnl.id)/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
-	// //4
-	// num(count({<    
-	// 		[inic.STATUS]={'Завершена', 'В работе'},
-	// 			[inic.DIRECTION]={'КРП'},
-	// 				[inic.year_report]={'2023'},
-	// 				[inic.control_date]={"<02.02.2024"}
-	// 			>}[inic.id])/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0')
-	// ,
-	// //5
-	// num(count({<    
-	// 		[inic.STATUS]={'Завершена', 'В работе'},
-	// 			[inic.DIRECTION]={'КРП', 'Бизнес идеи (КРП)'},
-	// 				[inic.year_report]={'2023'},
-	// 				[inic.control_date]={">02.02.2024<02.02.2025"}
-	// 			>}[inic.id])/(pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ), 4,3,2,1)), '0,0'),
-	// //6
-	// num(count({<    
-	// 		[inic.STATUS]={'Завершена', 'В работе'},
-	// 			[inic.DIRECTION]={'КРП', 'Бизнес идеи (КРП)'},
-	// 				[inic.year_report]={'2023'},
-	// 				[inic.control_date]={"<02.02.2024"} 
-	// 			>}[inic.id])/
-	// 			count(org_gosb_code), '0,0')
-	// )       
-
-	// METRIC_PLAN_VALUE
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// num(1.5,'0,0'),
-	// //2
-	// 0,
-	// //3
-	// 0,
-	// //4
-	// num(1.0,'0,0'),
-	// //5
-	// num(0.7,'0,0'),
-	// //6
-	// ''
-	// )
-
-	// REPORT_DATE=today()
-
-	// COMMENT
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// '1)	Количество идей КРП на текущий год '&
-	// 						count({<
-	// 															[inic.DIRECTION]={'Бизнес идеи (КРП)'},
-	// 															[inic.STATUS]={'В работе'},
-	// 															[inic.year_report]={'2023'},
-	// 															[inic.control_date]={"<02.02.2024"}
-	// 															>}
-	// 																[inic.title])&' шт.'&chr(13)&
-	// '2)	Количество КРП, реализуемых в текущем году '&
-	// 							count({<
-	// 															[inic.DIRECTION]={'КРП'},
-	// 															[inic.STATUS]={'В работе'},
-	// 															[inic.year_report]={'2023'},
-	// 															[inic.control_date]={"<02.02.2024"}
-	// 															>}
-	// 																[inic.title])&' шт.'&chr(13)&
-	// '3)	Ориентир КРП на текущий год '& pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ),4,3,2,1) &' шт.',
-	// //2
-	// '',
-	// //3
-	// '',
-	// //4
-	// '1)	Количество КРП, реализуемых в текущем году '&
-	// 						count({<
-	// 															[inic.DIRECTION]={'КРП'},
-	// 															[inic.STATUS]={'В работе'},
-	// 															[inic.year_report]={'2023'},
-	// 															[inic.control_date]={"<02.02.2024"}
-	// 															>}
-	// 																[inic.title])&' шт.'&chr(13)&
-	// '2)	Количество КРП завершенных в текущем году '&
-	// 							count({<
-	// 															[inic.DIRECTION]={'КРП'},
-	// 															[inic.STATUS]={'Завершена'},
-	// 															[inic.year_report]={'2023'},
-	// 															[inic.control_date]={"<02.02.2024"}
-	// 															>}
-	// 																[inic.title])&' шт.'&chr(13)&
-	// '3)	Ориентир КРП на текущий год '& pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ),4,3,2,1) &' шт.',
-	// //5
-	// '1)	количество идей КРП на следующий год '&
-	// 	count({<    
-	// 		[inic.STATUS]={'В работе'},
-	// 			[inic.DIRECTION]={'Бизнес идеи (КРП)'},
-	// 				[inic.year_report]={'2023'},
-	// 				[inic.control_date]={">02.02.2024<02.02.2025"}
-	// 			>}[inic.id])&' (шт.)'&chr(13)&
-	// '2)	количество КРП, реализуемых в следующем году '&
-	// 	count({<    
-	// 		[inic.STATUS]={'В работе'},
-	// 			[inic.DIRECTION]={'КРП'},
-	// 				[inic.year_report]={'2023'},
-	// 				[inic.control_date]={">02.02.2024<02.02.2025"}
-	// 			>}[inic.id])&' (шт.)'&chr(13)&
-	// '3)	план КРП на текущий год '&pick(match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4' ),4,3,2,1)&' (шт.) (считаем, что план на следующий год равен текущему)',
-			
-	// //6
-	// '1)	Количество идей КРП на текущий год: '&
-	// 						count({<
-	// 															[inic.DIRECTION]={'Бизнес идеи (КРП)'},
-	// 															[inic.STATUS]={'Завершена', 'В работе'},
-	// 															[inic.year_report]={'2023'},
-	// 															[inic.control_date]={"<02.02.2024"}
-	// 															>}
-	// 																[inic.title])&' шт.'&chr(13)&
-	// '2)	Количество КРП в текущем году в статусе реализуется и завершена: '&
-	// 						count({<
-	// 															[inic.DIRECTION]={'КРП'},
-	// 															[inic.STATUS]={'Завершена', 'В работе'},
-	// 															[inic.year_report]={'2023'},
-	// 															[inic.control_date]={"<02.02.2024"}
-	// 															>}
-	// 																[inic.title])&' шт.'&chr(13)&
-	// '3)	ГОСБ: '&count(org_gosb_code) &' шт.'
-	// )
-
-	// STRUCT_LEVEL='STUFF'
-
-	// METRIC_DIRECT=MetrID_direct
-
-	// Команда
-	// cbm_element:
-
-	//METRIC_ID=MetrID
-
-	//METRIC_NAME=MetrID_name
-
-	//TB_ID=if(org_tb_code<>38,org_tb_code)
-
-	//GOSB_ID=pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //2
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //3
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //4
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //5
-	// if(org_gosb_code<>9052,org_gosb_code),
-	// //6
-	// ''
-	// )
-
-	// METRIC_VALUE
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// ' ',
-	// //2
-	// ' ',
-	// //3
-	// ' ',
-	// //4
-	// ' ',
-	// //5
-	// ' ',
-	// //6
-	// ' '
-	// )
-
-	// METRIC_PLAN_VALUE
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// ' ',
-	// //2
-	// ' ',
-	// //3
-	// ' ',
-	// //4
-	// ' ',
-	// //5
-	// ' ',
-	// //6
-	// ' '
-	// )
-
-	// REPORT_DATE=today()
-
-	// COMMENT
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// ' ',
-	// //2
-	// ' ',
-	// //3
-	// ' ',
-	// //4
-	// ' ',
-	// //5
-	// ' ',
-	// //6
-	// ' '
-	// )
-
-	// STRUCT_LEVEL='ELEMENT'
+	// Элемент
 
 	// DEV_ELEMENT_NAME
 	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
