@@ -179,7 +179,33 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		// inic.Comment,
 		'ELEMENT' as inic.StructLevel,
 		inic.MetricDirection,
-		// inic.DevElementTitle,
+		// Заголовок элемента
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
+			//10000015
+			If(((inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'КРП')) and 
+					((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
+					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')),
+				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status
+			),
+			//10000016
+			If((inic.Direction = 'Бизнес идеи (КРП)') and (inic.Status = 'В работе') and 
+					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')) and 
+					(inic.CreateDate < Date(Today() - 60)),
+				inic.Title & ', дата создания: ' & inic.CreateDate & ' (в ожидании ' & (Today() - inic.CreateDate) & ' дн.)'),
+			//10000017
+			If((inic.Direction = 'Бизнес идеи (КРП)') and (inic.Status = 'Отменена') and 
+					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')),
+				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status),
+			//10000018
+			If((inic.Direction = 'КРП') and ((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
+					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')),
+				inic.Direction & ': '& inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status),
+			//10000019
+			If(((inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'КРП')) and 
+					((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
+					(inic.YearReport = '2023') and (inic.ControlDate > Date('02.02.2024')) and (inic.ControlDate < Date('02.02.2025')),
+				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status)
+		) as inic.DevElementTitle,
 		// Вспомогательные поля
 		inic.Cluster,
 		inic.ID,
@@ -193,7 +219,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	drop table cbm_inic;
 	rename table temp to cbm_inic;
 
-	// Знаменатель, исходя из кластера ГОСБ
+	// Ориентир, исходя из кластера ГОСБ
 	set cbmGetClusterMilestone = Pick(Match(inic.Cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4') + 1, 1, 4, 3, 2, 1);
 
 	// Группирует по ГОСБ с кластером, метрике и получает аггрегаты
@@ -342,30 +368,6 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		) as inic.Comment
 	resident cbm_inic
 	group by org_code, inic.MetricID, inic.Cluster;
-
-	// Элемент
-
-	// DEV_ELEMENT_NAME
-	// =pick(match(MetrID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// //1
-	// if(([inic.DIRECTION]='Бизнес идеи (КРП)' or [inic.DIRECTION]='КРП')  and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена' )and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
-	// [inic.DIRECTION]&': '&[inic.title]&', срок: '&[inic.control_date]&', статус: '&[inic.STATUS]),
-	// //2
-	// if([inic.DIRECTION]='Бизнес идеи (КРП)' and [inic.STATUS]='В работе' and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024') and [inic.create_date]< date('$(vTod1m)'),
-	// [inic.title]&', дата создания: '&[inic.create_date]&' (в ожидании '&(today()-[inic.create_date]) &' дн.)' ),
-	// //3
-	// if( [iniccnl.DIRECTION]='Бизнес идеи (КРП)' and [iniccnl.STATUS]='Отменена' and [iniccnl.year_report]='2023' and [iniccnl.control_date]< date('02.02.2024'),
-	// [iniccnl.DIRECTION]&': '&[iniccnl.title]&', срок: '&[iniccnl.control_date]&', статус: '&[iniccnl.STATUS]),
-	// //4
-	// if( [inic.DIRECTION]='КРП' and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена') and [inic.year_report]='2023' and [inic.control_date]< date('02.02.2024'),
-	// [inic.DIRECTION]&': '&[inic.title]&', срок: '&[inic.control_date]&', статус: '&[inic.STATUS]),
-	// //5
-
-	// if(([inic.DIRECTION]='Бизнес идеи (КРП)' or [inic.DIRECTION]='КРП')  and ([inic.STATUS]='В работе' or [inic.STATUS]='Завершена' ) and [inic.year_report]='2023' and  ([inic.control_date]>date('02.02.2024') and [inic.control_date]<date('02.02.2025')) ,
-	// [inic.DIRECTION]&': '&[inic.title]&', срок: '&[inic.control_date]&', статус: '&[inic.STATUS]),
-	// //6  
-	// ' '
-	// )
 
 	//////////////////////////////////////////////////////////////////////////////////
 
