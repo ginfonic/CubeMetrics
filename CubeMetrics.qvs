@@ -115,57 +115,57 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	drop table cbm_inic;
 	rename table temp to cbm_inic;
 
-	// Команда
-	cbm_stuff:
-	noconcatenate load 
-		org_code,
-		inic.MetricID as stuff.MetricID,
-		inic.MetricTitle as stuff.MetricTitle,
-		// inic.TBCode as stuff.TBCode,
-		// If(inic.MetricID <> 10000020, inic.GOSBCode) as stuff.GOSBCode,
-		// stuff.MetricValue,
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as stuff.MetricPlanValue,
-		Today() as stuff.ReportDate,
-		// stuff.Comment,
-		'STUFF' as stuff.StructLevel,
-		inic.MetricDirection as stuff.MetricDirection,
-		'' as stuff.DevElementTitle,
-		// Вспомогательные поля
-		inic.Cluster as stuff.Cluster,
-		inic.ID as stuff.ID,
-		inic.Direction as stuff.Direction,
-		inic.Title as stuff.Title,
-		inic.ControlDate as stuff.ControlDate,
-		inic.CreateDate as stuff.CreateDate,
-		inic.Status as stuff.Status,
-		inic.YearReport as stuff.YearReport
-	resident cbm_inic;
+	// // Команда
+	// cbm_stuff:
+	// noconcatenate load 
+	// 	org_code,
+	// 	inic.MetricID as stuff.MetricID,
+	// 	inic.MetricTitle as stuff.MetricTitle,
+	// 	// inic.TBCode as stuff.TBCode,
+	// 	// If(inic.MetricID <> 10000020, inic.GOSBCode) as stuff.GOSBCode,
+	// 	// stuff.MetricValue,
+	// 	Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as stuff.MetricPlanValue,
+	// 	Today() as stuff.ReportDate,
+	// 	// stuff.Comment,
+	// 	'STUFF' as stuff.StructLevel,
+	// 	inic.MetricDirection as stuff.MetricDirection,
+	// 	'' as stuff.DevElementTitle,
+	// 	// Вспомогательные поля
+	// 	inic.Cluster as stuff.Cluster,
+	// 	inic.ID as stuff.ID,
+	// 	inic.Direction as stuff.Direction,
+	// 	inic.Title as stuff.Title,
+	// 	inic.ControlDate as stuff.ControlDate,
+	// 	inic.CreateDate as stuff.CreateDate,
+	// 	inic.Status as stuff.Status,
+	// 	inic.YearReport as stuff.YearReport
+	// resident cbm_inic;
 
-	// Элемент
-	cbm_elem:
-	noconcatenate load 
-		org_code,
-		inic.MetricID as elem.MetricID,
-		inic.MetricTitle as elem.MetricTitle,
-		// inic.TBCode as elem.TBCode,
-		// If(inic.MetricID <> 10000020, inic.GOSBCode) as elem.GOSBCode,
-		// elem.MetricValue,
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as elem.MetricPlanValue,
-		Today() as elem.ReportDate,
-		'' as elem.Comment,
-		'ELEMENT' as elem.StructLevel,
-		inic.MetricDirection as elem.MetricDirection,
-		// elem.DevElementTitle,
-		// Вспомогательные поля
-		inic.Cluster as elem.Cluster,
-		inic.ID as elem.ID,
-		inic.Direction as elem.Direction,
-		inic.Title as elem.Title,
-		inic.ControlDate as elem.ControlDate,
-		inic.CreateDate as elem.CreateDate,
-		inic.Status as elem.Status,
-		inic.YearReport as elem.YearReport
-	resident cbm_inic;
+	// // Элемент
+	// cbm_elem:
+	// noconcatenate load 
+	// 	org_code,
+	// 	inic.MetricID as elem.MetricID,
+	// 	inic.MetricTitle as elem.MetricTitle,
+	// 	// inic.TBCode as elem.TBCode,
+	// 	// If(inic.MetricID <> 10000020, inic.GOSBCode) as elem.GOSBCode,
+	// 	// elem.MetricValue,
+	// 	Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as elem.MetricPlanValue,
+	// 	Today() as elem.ReportDate,
+	// 	'' as elem.Comment,
+	// 	'ELEMENT' as elem.StructLevel,
+	// 	inic.MetricDirection as elem.MetricDirection,
+	// 	// elem.DevElementTitle,
+	// 	// Вспомогательные поля
+	// 	inic.Cluster as elem.Cluster,
+	// 	inic.ID as elem.ID,
+	// 	inic.Direction as elem.Direction,
+	// 	inic.Title as elem.Title,
+	// 	inic.ControlDate as elem.ControlDate,
+	// 	inic.CreateDate as elem.CreateDate,
+	// 	inic.Status as elem.Status,
+	// 	inic.YearReport as elem.YearReport
+	// resident cbm_inic;
 
 	// Объединенная
 	temp:
@@ -174,8 +174,9 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		inic.MetricID,
 		inic.MetricTitle,
 		// inic.MetricValue,
-		// Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as inic.MetricPlanValue,
-		// Today() as inic.ReportDate,
+		// Плановое значение
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as inic.MetricPlanValue,
+		Today() as inic.ReportDate,
 		// inic.Comment,
 		'ELEMENT' as inic.StructLevel,
 		inic.MetricDirection,
@@ -223,7 +224,9 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	set cbmGetClusterMilestone = Pick(Match(inic.Cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4') + 1, 1, 4, 3, 2, 1);
 
 	// Группирует по ГОСБ с кластером, метрике и получает аггрегаты
-	left join(cbm_inic) load
+	cbm_stuff:
+	// left join(cbm_inic) load
+	noconcatenate load
 		org_code, 
 		inic.Cluster,
 		inic.MetricID,
