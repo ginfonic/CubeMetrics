@@ -32,7 +32,8 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 			Year(Now())
 		) as inic.YearReport
 	from [$(tasks_qvd)] (qvd)
-	where (parent_id = 0) and ((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
+	where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
+		((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
 
 	// Таблица отмененных инициатив
 	cbm_inic_cancel:
@@ -46,12 +47,13 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		STATUS as inic.Status,
 		Year(Now()) as inic.YearReport
 	from [$(tasks_qvd)] (qvd)
-	where (parent_id = 0) and (Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
+	where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
+		(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
  
 	// Шаблон метрик
 	cbm_metrics_lookup:
 	noconcatenate load * Inline [
-		inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlan
+		inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlanValue
 		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
 		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
@@ -65,11 +67,11 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	resident cbm_metrics_lookup
 	where inic.MetricID <> 10000017;
 
-	// Добавляет метрики к таблице отменненных инициатив
+	// Добавляет метрики к таблице отмененных инициатив
 	join(cbm_inic_cancel) load * 
 	resident cbm_metrics_lookup
 	where inic.MetricID = 10000017;
-	drop table cbm_metrics_lookup;
+	// drop table cbm_metrics_lookup;
 
 	// Сливает таблицу отмененных инициатив с таблицей инициатив
 	concatenate(cbm_inic) load *
@@ -87,7 +89,8 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 			org_tb_name,
 			org_gosb_name,
 			org_cluster
-		from [$(org_qvd)] (qvd);
+		from [$(org_qvd)] (qvd)
+		where (org_tb_code <> 38) and (org_gosb_code <> 9052);
 	else
 		//Excel
 		org:
@@ -98,22 +101,39 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 			$(ggffT2N(org_tb_name)) as org_tb_name,
 			$(ggffT2N(org_gosb_name)) as org_gosb_name,
 			$(ggffT2N(org_cluster)) as org_cluster
-		from [$(org_xlsx)] (ooxml, embedded labels, table is Sheet1);
+		from [$(org_xlsx)] (ooxml, embedded labels, table is Sheet1)
+		where (org_tb_code <> 38) and (org_gosb_code <> 9052);
 	end if;
 
 	// Добавляет кластер из таблицы оргкодов к таблице инициатив
 	left join (cbm_inic) load
 		org_code,
-		org_cluster as inic.Cluster
+		If(IsNull(org_cluster), 'Без группы', org_cluster) as inic.Cluster
 	resident org;
 
-	// Убирает Москву и Крым
+	// Создает матрицу ТБ/ГОСБ
+	cbm_mtx:
+	noconcatenate load 
+		org_code as org_code_1,
+		If(IsNull(org_cluster), 'Без группы', org_cluster) as inic.Cluster_1 
+	resident org
+	where not IsNull(org_tb_code);
+
+	// Добавляет к ней метрики
+	join(cbm_mtx) load 
+		inic.MetricID as inic.MetricID_1, 
+		inic.MetricTitle as inic.MetricTitle_1, 
+		inic.MetricDirection as inic.MetricDirection_1, 
+		inic.MetricPlanValue as inic.MetricPlanValue_1
+	resident cbm_metrics_lookup;
+	drop table cbm_metrics_lookup;
+
+	// Убирает из матрицы неактуальные строки (20 метрика только по ТБ)
 	temp:
-	noconcatenate load * 
-	resident cbm_inic 
-	where (org_code <> 3838) and (org_code <> 529052);
-	drop table cbm_inic;
-	rename table temp to cbm_inic;
+	noconcatenate load * resident cbm_mtx
+	where ((Len(org_code_1) > 2) and (inic.MetricID_1 <> 10000020)) or ((Len(org_code_1) = 2) and (inic.MetricID_1 = 10000020));
+	drop table cbm_mtx;
+	rename table temp to cbm_mtx;
 
 	// // Команда
 	// cbm_stuff:
@@ -124,7 +144,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	// 	// inic.TBCode as stuff.TBCode,
 	// 	// If(inic.MetricID <> 10000020, inic.GOSBCode) as stuff.GOSBCode,
 	// 	// stuff.MetricValue,
-	// 	Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as stuff.MetricPlanValue,
+	// 	Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as stuff.ValueValue,
 	// 	Today() as stuff.ReportDate,
 	// 	// stuff.Comment,
 	// 	'STUFF' as stuff.StructLevel,
@@ -150,7 +170,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	// 	// inic.TBCode as elem.TBCode,
 	// 	// If(inic.MetricID <> 10000020, inic.GOSBCode) as elem.GOSBCode,
 	// 	// elem.MetricValue,
-	// 	Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as elem.MetricPlanValue,
+	// 	Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as elem.ValueValue,
 	// 	Today() as elem.ReportDate,
 	// 	'' as elem.Comment,
 	// 	'ELEMENT' as elem.StructLevel,
@@ -173,11 +193,8 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		org_code,
 		inic.MetricID,
 		inic.MetricTitle,
-		// inic.MetricValue,
-		// Плановое значение
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019), 1.5, 0, 0, 1, 0.7) as inic.MetricPlanValue,
+		inic.MetricPlanValue,
 		Today() as inic.ReportDate,
-		// inic.Comment,
 		'ELEMENT' as inic.StructLevel,
 		inic.MetricDirection,
 		// Заголовок элемента
@@ -225,11 +242,13 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 
 	// Группирует по ГОСБ с кластером, метрике и получает аггрегаты
 	cbm_stuff:
-	// left join(cbm_inic) load
 	noconcatenate load
-		org_code, 
-		inic.Cluster,
-		inic.MetricID,
+		org_code as org_code_1, 
+		inic.MetricID as inic.MetricID_1,
+		inic.MetricTitle as inic.MetricTitle_1, 
+		inic.MetricDirection as inic.MetricDirection_1, 
+		inic.MetricPlanValue as inic.MetricPlanValue_1, 
+		inic.Cluster as inic.Cluster_1,
 		// Значение метрики
 		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),
 			//10000015
@@ -287,7 +306,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 			)) /
 			// Считает только коды ГОСБ
 			Count(If(Len(org_code) > 2, org_code))
-		) as inic.MetricValue,
+		) as inic.MetricValue_1,
 		// Комментарий
 		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),
 			//10000015
@@ -368,9 +387,28 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 			)) & ' шт. '& chr(13) &
 			'3)	ГОСБ: ' & 
 			Count(If(Len(org_code) > 2, org_code)) & ' шт.'
-		) as inic.Comment
+		) as inic.Comment_1
 	resident cbm_inic
-	group by org_code, inic.MetricID, inic.Cluster;
+	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or ((Len(org_code) = 2) and (inic.MetricID = 10000020))
+	group by org_code, inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
+
+	concatenate(cbm_stuff) load * resident cbm_mtx;
+	drop table cbm_mtx;
+
+	temp:
+	noconcatenate load
+		org_code_1, 
+		inic.MetricID_1, 
+		inic.MetricTitle_1, 
+		inic.MetricDirection_1, 
+		inic.MetricPlanValue_1, 
+		inic.Cluster_1,
+		Sum(inic.MetricValue_1) as inic.MetricValue_1,
+		Concat(inic.Comment_1, '') as inic.Comment_1
+	resident cbm_stuff
+	group by org_code_1, inic.MetricID_1, inic.MetricTitle_1, inic.MetricDirection_1, inic.MetricPlanValue_1, inic.Cluster_1;
+	drop table cbm_stuff;
+	rename table temp to cbm_stuff;
 
 	//////////////////////////////////////////////////////////////////////////////////
 
