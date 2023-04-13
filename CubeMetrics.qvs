@@ -240,7 +240,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	// Ориентир, исходя из кластера ГОСБ
 	set cbmGetClusterMilestone = Pick(Match(inic.Cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4') + 1, 1, 4, 3, 2, 1);
 
-	// Группирует по ГОСБ с кластером, метрике и получает аггрегаты
+	// Группирует по оргкоду с кластером, метрике с дополнениями и получает таблицу команды
 	cbm_stuff:
 	noconcatenate load
 		org_code as org_code_1, 
@@ -392,9 +392,11 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or ((Len(org_code) = 2) and (inic.MetricID = 10000020))
 	group by org_code, inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
 
+	// Добавляет к таблице команды матрицу
 	concatenate(cbm_stuff) load * resident cbm_mtx;
 	drop table cbm_mtx;
 
+	// Сливает таблицу с матрицей
 	temp:
 	noconcatenate load
 		org_code_1, 
@@ -409,6 +411,26 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	group by org_code_1, inic.MetricID_1, inic.MetricTitle_1, inic.MetricDirection_1, inic.MetricPlanValue_1, inic.Cluster_1;
 	drop table cbm_stuff;
 	rename table temp to cbm_stuff;
+
+	// Добавляет в таблицу элементов расчитанное значение метрики
+	left join(cbm_inic) load
+		org_code_1 as org_code,
+		inic.MetricID_1 as inic.MetricID,
+		inic.MetricValue_1 as inic.MetricValue
+	resident cbm_stuff;
+
+	// Сливает таблицу команды с таблицей элементов
+	concatenate(cbm_inic) load
+		org_code_1 as org_code,
+		inic.MetricID_1 as inic.MetricID, 
+		inic.MetricTitle_1 as inic.MetricTitle, 
+		inic.MetricDirection_1 as inic.MetricDirection, 
+		inic.MetricPlanValue_1 as inic.MetricPlanValue, 
+		inic.MetricValue_1 as inic.MetricValue,
+		inic.Comment_1 as inic.Comment,
+		'STUFF' as inic.StructLevel
+	resident cbm_stuff;
+	drop table cbm_stuff;
 
 	//////////////////////////////////////////////////////////////////////////////////
 
