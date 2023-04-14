@@ -12,6 +12,12 @@ end sub;
 
 //Создает модель данных
 sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, org_xlsx)
+	// Выражения расчета необходимых дат
+	set cbmGetPrevMStart = MonthStart(AddMonths(Today(), -1));
+	set cbmGetPrevMEnd = MonthEnd(AddMonths(Today(), -1));
+	set cbmGetPrevQStart = QuarterStart(AddMonths(Today(), -3));
+	set cbmGetPrevQEnd = QuarterEnd(AddMonths(Today(), -3));
+
 	// Таблица инициатив
 	cbm_inic:
 	noconcatenate load
@@ -51,7 +57,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	// Шаблон метрик
 	cbm_metrics_lookup:
 	noconcatenate load * Inline [
-		inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlanValue
+		inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue
 		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
 		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
@@ -120,7 +126,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	noconcatenate load
 		org_code, 
 		inic.MetricID,
-		inic.MetricTitle, 
+		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
 		inic.Cluster,
@@ -265,7 +271,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		) as inic.Comment
 	resident cbm_inic
 	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or ((Len(org_code) = 2) and (inic.MetricID = 10000020))
-	group by org_code, inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
+	group by org_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
 
 	// Создает матрицу ТБ/ГОСБ
 	cbm_mtx:
@@ -278,7 +284,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	// Добавляет к матрице метрики
 	join(cbm_mtx) load 
 		inic.MetricID, 
-		inic.MetricTitle, 
+		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue
 	resident cbm_metrics_lookup;
@@ -301,30 +307,29 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	noconcatenate load
 		org_code, 
 		inic.MetricID, 
-		inic.MetricTitle, 
+		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
 		inic.Cluster,
 		Sum(inic.MetricValue) as inic.MetricValue,
 		Only(inic.Comment) as inic.Comment
 	resident cbm_stuff
-	group by org_code, inic.MetricID, inic.MetricTitle, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
+	group by org_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
 	drop table cbm_stuff;
 	rename table temp to cbm_stuff;
 
 	// Убирает из таблицы инициатив записи с пустым DevElementTitle
 	temp:
-	noconcatenate load * where not(IsNull(inic.DevElementTitle));
+	noconcatenate load * where not(IsNull(inic.DevElementName));
 	// Убирает из таблицы ненужные поля и добавляет нужные
 	noconcatenate load
 		org_code,
 		inic.MetricID, 
-		inic.MetricTitle, 
+		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
-		Today() as inic.ReportDate,
 		'ELEMENT' as inic.StructLevel,
-		// Заголовок элемента
+		// Имя элемента
 		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
 			If(((inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'КРП')) and 
@@ -350,7 +355,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 					((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
 					(inic.YearReport = '2023') and (inic.ControlDate > Date('02.02.2024')) and (inic.ControlDate < Date('02.02.2025')),
 				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status)
-		) as inic.DevElementTitle
+		) as inic.DevElementName
 	resident cbm_inic;
 	drop table cbm_inic;
 	rename table temp to cbm_inic;
@@ -366,211 +371,325 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	concatenate(cbm_inic) load
 		org_code,
 		inic.MetricID, 
-		inic.MetricTitle, 
+		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
 		inic.MetricValue, 
 		inic.Comment,
-		'STUFF' as inic.StructLevel,
-		Today() as inic.ReportDate
+		'STUFF' as inic.StructLevel
 	resident cbm_stuff;
 	drop table cbm_stuff;
 
-	//////////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////////////////////////////////////////////////
-
-	// Получает элементы
-	if '$(cbmConnection)' = '1' then
-		//QVD
-		cbm_data:
-		noconcatenate load
-			METRIC_ID,
-			METRIC_NAME,
-			TB_ID,
-			GOSB_ID,
-			METRIC_VALUE as METRIC_VALUE_1,
-			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-			REPORT_DATE as REPORT_DATE_1,
-			STRUCT_LEVEL,
-			DEV_ELEMENT_NAME
-		from [$(cbm_element_xl)] (qvd);
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	else
-		//Excel
-		cbm_data:
-		noconcatenate load
-			METRIC_ID,
-			METRIC_NAME,
-			TB_ID,
-			GOSB_ID,
-			METRIC_VALUE as METRIC_VALUE_1,
-			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-			REPORT_DATE as REPORT_DATE_1,
-			STRUCT_LEVEL,
-			DEV_ELEMENT_NAME
-		from [$(cbm_element_xl)] (ooxml, embedded labels, table is Sheet1);
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	end if;
-
-	// Получает команду
-	if '$(cbmConnection)' = '1' then
-		//QVD
-		concatenate(cbm_data) load
-			METRIC_ID,
-			METRIC_NAME,
-			TB_ID,
-			GOSB_ID,
-			METRIC_VALUE as METRIC_VALUE_1,
-			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-			REPORT_DATE as REPORT_DATE_1,
-			"COMMENT" as DEV_ELEMENT_NAME,
-			STRUCT_LEVEL,
-			METRIC_DIRECT as METRIC_DIRECT_1
-		from [$(cbm_stuff_xl)] (qvd);
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	else
-		//Excel
-		concatenate(cbm_data) load
-			METRIC_ID,
-			METRIC_NAME,
-			TB_ID,
-			GOSB_ID,
-			METRIC_VALUE as METRIC_VALUE_1,
-			METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-			REPORT_DATE as REPORT_DATE_1,
-			"COMMENT" as DEV_ELEMENT_NAME,
-			STRUCT_LEVEL,
-			METRIC_DIRECT as METRIC_DIRECT_1
-		from [$(cbm_stuff_xl)] (ooxml, embedded labels, table is Sheet1);
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	end if;
-
 	// Расчитывает значение перцентилей 0,75 и 0,25
-	left join(cbm_data) load
-		METRIC_ID,
-		Fractile(METRIC_VALUE_1, 0.75) as PERCENTILE75,
-		Fractile(METRIC_VALUE_1, 0.25) as PERCENTILE25
-	resident cbm_data
+	left join(cbm_inic) load
+		inic.MetricID,
+		Fractile(inic.MetricValue, 0.75) as inic.Percentile75,
+		Fractile(inic.MetricValue, 0.25) as inic.Percentile25
+	resident cbm_inic
 	where (
-		(STRUCT_LEVEL = 'STUFF') and 
+		(inic.StructLevel = 'STUFF') and 
 		(
-			((METRIC_ID = 10000015) and (METRIC_VALUE_1 >= 1.5)) or 
-			((METRIC_ID = 10000017) and (METRIC_VALUE_1 > 0)) or 
-			((METRIC_ID = 10000018) and (METRIC_VALUE_1 >= 1)) or 
-			((METRIC_ID = 10000019) and (METRIC_VALUE_1 >= 0.7)) or
-			(METRIC_ID = 10000020)
+			((inic.MetricID = 10000015) and (inic.MetricValue >= 1.5)) or 
+			((inic.MetricID = 10000017) and (inic.MetricValue > 0)) or 
+			((inic.MetricID = 10000018) and (inic.MetricValue >= 1)) or 
+			((inic.MetricID = 10000019) and (inic.MetricValue >= 0.7)) or
+			(inic.MetricID = 10000020)
 		)
 	)
-	group by METRIC_ID;
-
-	// Выражения расчета необходимых дат
-	set cbmGetPrevMStart = MonthStart(AddMonths(REPORT_DATE_1, -1));
-	set cbmGetPrevMEnd = MonthEnd(AddMonths(REPORT_DATE_1, -1));
-	set cbmGetPrevQStart = QuarterStart(AddMonths(REPORT_DATE_1, -3));
-	set cbmGetPrevQEnd = QuarterEnd(AddMonths(REPORT_DATE_1, -3));
+	group by inic.MetricID;
 
 	temp:
 	noconcatenate load *,
 	// Добавляет пустые и стандартные поля
-	'' as ELEMENT_TYPE, 
-	'' as ELEMENT_ID,
-	'EXT_FILE' as SEGMENT ,
-	// Добавляет поле LOAD_ID из метрики и даты отчета
-	If((METRIC_ID = 10000018) or (METRIC_ID = 10000019),
-		METRIC_ID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
-		METRIC_ID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
-	) as LOAD_ID, 
+	Null() as inic.ElementType, 
+	Null() as inic.ElementID,
+	'EXT_FILE' as inic.Segment,
+	Date(Floor($(cbmGetPrevMEnd))) as inic.ReportDate,
+	// Рассчитывает поле LOAD_ID из метрики и текущей даты
+	If((inic.MetricID = 10000018) or (inic.MetricID = 10000019),
+		inic.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
+		inic.MetricID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
+	) as inic.LoadID, 
 	// Рассчитывает поле DEVIATION_MARKER
-	If(not $(ggffIsEmpty(METRIC_VALUE_1)),
-		Pick(Match(METRIC_ID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	If(not $(ggffIsEmpty(inic.MetricValue)),
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
 			// 10000015
-			If(METRIC_VALUE_1 < 1.5, 
+			If(inic.MetricValue < 1.5, 
 				1, 
-				If(METRIC_VALUE_1 >= PERCENTILE75,
+				If(inic.MetricValue >= inic.Percentile75,
 					13,
 					0
 				)
 			),
 			// 10000016
-			If(METRIC_VALUE_1 > 0, 1, 0), 
+			If(inic.MetricValue > 0, 1, 0), 
 			// 10000017
-			If(METRIC_VALUE_1 = 0, 
+			If(inic.MetricValue = 0, 
 				13, 
-				If(METRIC_VALUE_1 >= PERCENTILE75,
+				If(inic.MetricValue >= inic.Percentile75,
 					1,
 					0
 				)
 			),
 			// 10000018
-			If(METRIC_VALUE_1 < 1, 
+			If(inic.MetricValue < 1, 
 				1, 
-				If(METRIC_VALUE_1 >= PERCENTILE75,
+				If(inic.MetricValue >= inic.Percentile75,
 					13,
 					0
 				)
 			),
 			// 10000019
-			If(METRIC_VALUE_1 < 0.7, 
+			If(inic.MetricValue < 0.7, 
 				1, 
-				If(METRIC_VALUE_1 >= PERCENTILE75,
+				If(inic.MetricValue >= inic.Percentile75,
 					13,
 					0
 				)
 			),
 			// 10000020
-			If(METRIC_VALUE_1 >= PERCENTILE75, 
+			If(inic.MetricValue >= inic.Percentile75, 
 				13, 
-				If(METRIC_VALUE_1 <= PERCENTILE25,
+				If(inic.MetricValue <= inic.Percentile25,
 					1,
 					0
 				)
 			))
-		) as DEVIATION_MARKER_1,
-	Date(Floor($(cbmGetPrevMEnd))) as REPORT_DATE,
-	TB_ID&GOSB_ID as ORG_CODE
-	resident cbm_data;
-	drop table cbm_data;
-	rename table temp to cbm_data;
-	drop fields PERCENTILE75, PERCENTILE25, REPORT_DATE_1;
+		) as inic.DeviationMarker
+	resident cbm_inic;
+	drop table cbm_inic;
+	rename table temp to cbm_inic;
+	drop fields inic.Percentile75, inic.Percentile25;
 
 	//Добавляет параметры ГОСБ
-	left join(cbm_data) load
-		// gosb.TBCode as TB_ID,
-		// gosb.GOSBCode as GOSB_ID,
-		org_code as ORG_CODE,
-		org_tb_name as TB_NAME,
-		org_gosb_name as GOSB_NAME
+	left join(cbm_inic) load
+		org_code,
+		org_tb_code as inic.TBCode,
+		org_gosb_code as inic.GOSBCode,
+		org_tb_name as inic.TBName,
+		org_gosb_name as inic.GOSBName
 	resident org;
 	drop table org;
 
-	// Заполняет пустые поля из таблицы Elements данными из Stuff
-	left join(cbm_data) load 
-		REPORT_DATE,
-		ORG_CODE,
-		METRIC_ID,
-		Max(METRIC_VALUE_1) as METRIC_VALUE,
-		Max(METRIC_PLAN_VALUE_1) as METRIC_PLAN_VALUE,
-		Max(METRIC_DIRECT_1) as METRIC_DIRECT,
-		Max(DEVIATION_MARKER_1) as DEVIATION_MARKER
-	resident cbm_data
-	group by REPORT_DATE, ORG_CODE, METRIC_ID;
-	drop fields METRIC_VALUE_1, METRIC_PLAN_VALUE_1, METRIC_DIRECT_1, DEVIATION_MARKER_1, ORG_CODE;
+	// Меняет названия столбцов на нужные
+	cbm_data:
+	noconcatenate load 
+		inic.MetricID as METRIC_ID,
+		inic.MetricName as METRIC_NAME,
+		inic.MetricDirection as METRIC_DIRECT,
+		inic.MetricPlanValue as METRIC_PLAN_VALUE,
+		inic.StructLevel as STRUCT_LEVEL,
+		inic.ReportDate as REPORT_DATE,
+		inic.TBCode as TB_ID,
+		inic.TBName as TB_NAME,
+		inic.GOSBCode as GOSB_ID,
+		inic.GOSBName as GOSB_NAME,
+		inic.DevElementName as DEV_ELEMENT_NAME,
+		inic.MetricValue as METRIC_VALUE,
+		inic.Comment as COMMENT,
+		inic.ElementType as ELEMENT_TYPE,
+		inic.ElementID as ELEMENT_ID,
+		inic.Segment as SEGMENT,
+		inic.LoadID as LOAD_ID,
+		inic.DeviationMarker as DEVIATION_MARKER
+	resident cbm_inic;
+	drop table cbm_inic;
 
-	// //Сохраняет таблицы
-	// for I=15 to 20
-	// 	cbm_data_$(I):
-	// 	noconcatenate load * resident cbm_data where METRIC_ID = '100000'&$(I);
-	// 	store cbm_data_$(I) into [lib://Data/cbm_out_$(I).csv] (TXT);
-	// 	drop table cbm_data_$(I);
-	// next;
+	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////
+
+	// // Получает элементы
+	// if '$(cbmConnection)' = '1' then
+	// 	//QVD
+	// 	cbm_data:
+	// 	noconcatenate load
+	// 		METRIC_ID,
+	// 		METRIC_NAME,
+	// 		TB_ID,
+	// 		GOSB_ID,
+	// 		METRIC_VALUE as METRIC_VALUE_1,
+	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+	// 		REPORT_DATE as REPORT_DATE_1,
+	// 		STRUCT_LEVEL,
+	// 		DEV_ELEMENT_NAME
+	// 	from [$(cbm_element_xl)] (qvd);
+
+	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	// else
+	// 	//Excel
+	// 	cbm_data:
+	// 	noconcatenate load
+	// 		METRIC_ID,
+	// 		METRIC_NAME,
+	// 		TB_ID,
+	// 		GOSB_ID,
+	// 		METRIC_VALUE as METRIC_VALUE_1,
+	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+	// 		REPORT_DATE as REPORT_DATE_1,
+	// 		STRUCT_LEVEL,
+	// 		DEV_ELEMENT_NAME
+	// 	from [$(cbm_element_xl)] (ooxml, embedded labels, table is Sheet1);
+
+	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	// end if;
+
+	// // Получает команду
+	// if '$(cbmConnection)' = '1' then
+	// 	//QVD
+	// 	concatenate(cbm_data) load
+	// 		METRIC_ID,
+	// 		METRIC_NAME,
+	// 		TB_ID,
+	// 		GOSB_ID,
+	// 		METRIC_VALUE as METRIC_VALUE_1,
+	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+	// 		REPORT_DATE as REPORT_DATE_1,
+	// 		"COMMENT" as DEV_ELEMENT_NAME,
+	// 		STRUCT_LEVEL,
+	// 		METRIC_DIRECT as METRIC_DIRECT_1
+	// 	from [$(cbm_stuff_xl)] (qvd);
+
+	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	// else
+	// 	//Excel
+	// 	concatenate(cbm_data) load
+	// 		METRIC_ID,
+	// 		METRIC_NAME,
+	// 		TB_ID,
+	// 		GOSB_ID,
+	// 		METRIC_VALUE as METRIC_VALUE_1,
+	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
+	// 		REPORT_DATE as REPORT_DATE_1,
+	// 		"COMMENT" as DEV_ELEMENT_NAME,
+	// 		STRUCT_LEVEL,
+	// 		METRIC_DIRECT as METRIC_DIRECT_1
+	// 	from [$(cbm_stuff_xl)] (ooxml, embedded labels, table is Sheet1);
+
+	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	// end if;
+
+	// // Расчитывает значение перцентилей 0,75 и 0,25
+	// left join(cbm_data) load
+	// 	METRIC_ID,
+	// 	Fractile(METRIC_VALUE_1, 0.75) as PERCENTILE75,
+	// 	Fractile(METRIC_VALUE_1, 0.25) as PERCENTILE25
+	// resident cbm_data
+	// where (
+	// 	(STRUCT_LEVEL = 'STUFF') and 
+	// 	(
+	// 		((METRIC_ID = 10000015) and (METRIC_VALUE_1 >= 1.5)) or 
+	// 		((METRIC_ID = 10000017) and (METRIC_VALUE_1 > 0)) or 
+	// 		((METRIC_ID = 10000018) and (METRIC_VALUE_1 >= 1)) or 
+	// 		((METRIC_ID = 10000019) and (METRIC_VALUE_1 >= 0.7)) or
+	// 		(METRIC_ID = 10000020)
+	// 	)
+	// )
+	// group by METRIC_ID;
+
+	// // Выражения расчета необходимых дат
+	// set cbmGetPrevMStart1 = MonthStart(AddMonths(REPORT_DATE_1, -1));
+	// set cbmGetPrevMEnd1 = MonthEnd(AddMonths(REPORT_DATE_1, -1));
+	// set cbmGetPrevQStart1 = QuarterStart(AddMonths(REPORT_DATE_1, -3));
+	// set cbmGetPrevQEnd1 = QuarterEnd(AddMonths(REPORT_DATE_1, -3));
+
+	// temp:
+	// noconcatenate load *,
+	// // Добавляет пустые и стандартные поля
+	// '' as ELEMENT_TYPE, 
+	// '' as ELEMENT_ID,
+	// 'EXT_FILE' as SEGMENT ,
+	// // Добавляет поле LOAD_ID из метрики и даты отчета
+	// If((METRIC_ID = 10000018) or (METRIC_ID = 10000019),
+	// 	METRIC_ID&'_'&Date($(cbmGetPrevQStart1), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd1), 'YYYYMMDD'),
+	// 	METRIC_ID&'_'&Date($(cbmGetPrevMStart1), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd1), 'YYYYMMDD')
+	// ) as LOAD_ID, 
+	// // Рассчитывает поле DEVIATION_MARKER
+	// If(not $(ggffIsEmpty(METRIC_VALUE_1)),
+	// 	Pick(Match(METRIC_ID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	// 		// 10000015
+	// 		If(METRIC_VALUE_1 < 1.5, 
+	// 			1, 
+	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
+	// 				13,
+	// 				0
+	// 			)
+	// 		),
+	// 		// 10000016
+	// 		If(METRIC_VALUE_1 > 0, 1, 0), 
+	// 		// 10000017
+	// 		If(METRIC_VALUE_1 = 0, 
+	// 			13, 
+	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
+	// 				1,
+	// 				0
+	// 			)
+	// 		),
+	// 		// 10000018
+	// 		If(METRIC_VALUE_1 < 1, 
+	// 			1, 
+	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
+	// 				13,
+	// 				0
+	// 			)
+	// 		),
+	// 		// 10000019
+	// 		If(METRIC_VALUE_1 < 0.7, 
+	// 			1, 
+	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
+	// 				13,
+	// 				0
+	// 			)
+	// 		),
+	// 		// 10000020
+	// 		If(METRIC_VALUE_1 >= PERCENTILE75, 
+	// 			13, 
+	// 			If(METRIC_VALUE_1 <= PERCENTILE25,
+	// 				1,
+	// 				0
+	// 			)
+	// 		))
+	// 	) as DEVIATION_MARKER_1,
+	// Date(Floor($(cbmGetPrevMEnd1))) as REPORT_DATE,
+	// TB_ID&GOSB_ID as ORG_CODE
+	// resident cbm_data;
+	// drop table cbm_data;
+	// rename table temp to cbm_data;
+	// drop fields PERCENTILE75, PERCENTILE25, REPORT_DATE_1;
+
+	// //Добавляет параметры ГОСБ
+	// left join(cbm_data) load
+	// 	// gosb.TBCode as TB_ID,
+	// 	// gosb.GOSBCode as GOSB_ID,
+	// 	org_code as ORG_CODE,
+	// 	org_tb_name as TB_NAME,
+	// 	org_gosb_name as GOSB_NAME
+	// resident org;
+	// drop table org;
+
+	// // Заполняет пустые поля из таблицы Elements данными из Stuff
+	// left join(cbm_data) load 
+	// 	REPORT_DATE,
+	// 	ORG_CODE,
+	// 	METRIC_ID,
+	// 	Max(METRIC_VALUE_1) as METRIC_VALUE,
+	// 	Max(METRIC_PLAN_VALUE_1) as METRIC_PLAN_VALUE,
+	// 	Max(METRIC_DIRECT_1) as METRIC_DIRECT,
+	// 	Max(DEVIATION_MARKER_1) as DEVIATION_MARKER
+	// resident cbm_data
+	// group by REPORT_DATE, ORG_CODE, METRIC_ID;
+	// drop fields METRIC_VALUE_1, METRIC_PLAN_VALUE_1, METRIC_DIRECT_1, DEVIATION_MARKER_1, ORG_CODE;
+
+	// // //Сохраняет таблицы
+	// // for I=15 to 20
+	// // 	cbm_data_$(I):
+	// // 	noconcatenate load * resident cbm_data where METRIC_ID = '100000'&$(I);
+	// // 	store cbm_data_$(I) into [lib://Data/cbm_out_$(I).csv] (TXT);
+	// // 	drop table cbm_data_$(I);
+	// // next;
 end sub;
 
 //Создает переменные и выражения
