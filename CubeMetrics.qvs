@@ -375,7 +375,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
 		inic.MetricValue, 
-		inic.Comment,
+		inic.Comment as inic.DevElementName,
 		'STUFF' as inic.StructLevel
 	resident cbm_stuff;
 	drop table cbm_stuff;
@@ -486,7 +486,6 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		inic.GOSBName as GOSB_NAME,
 		inic.DevElementName as DEV_ELEMENT_NAME,
 		inic.MetricValue as METRIC_VALUE,
-		inic.Comment as COMMENT,
 		inic.ElementType as ELEMENT_TYPE,
 		inic.ElementID as ELEMENT_ID,
 		inic.Segment as SEGMENT,
