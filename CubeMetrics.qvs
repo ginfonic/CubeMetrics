@@ -82,6 +82,23 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	resident cbm_inic_cancel;
 	drop table cbm_inic_cancel;
 
+	// Создает таблицу команды из таблицы инициатив
+	cbm_stuff:
+	noconcatenate load
+		org_code, 
+		inic.MetricID,
+		inic.MetricName, 
+		inic.MetricDirection, 
+		inic.MetricPlanValue,
+		// Поля для расчета
+		inic.ID,
+		inic.Status,
+		inic.Direction,
+		inic.YearReport,
+		inic.ControlDate,
+		inic.CreateDate
+	resident cbm_inic;
+
 	// Загружает таблицу оргкодов
 	if '$(cbmConnection)' = '1' then
 		//QVD
@@ -109,29 +126,24 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		where (org_tb_code <> 38) and (org_gosb_code <> 9052);
 	end if;
 
-	// Возвращает кластер или 'Без группы' для ТБ
-	set cbmGetCluster = If(IsNull(org_cluster), 'Без группы', org_cluster);
-
-	// Добавляет к таблице инициатив кластер из таблицы оргкодов
-	left join (cbm_inic) load
+	// Добавляет к таблице команды данные из таблицы оргкодов
+	left join (cbm_stuff) load
 		org_code,
-		$(cbmGetCluster) as inic.Cluster
+		org_tb_code,
+		org_gosb_code,
+		If(IsNull(org_cluster), 'Без группы', org_cluster) as inic.Cluster
 	resident org;
 
 	// Ориентир, исходя из кластера ГОСБ
 	set cbmGetClusterMilestone = Pick(Match(inic.Cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4') + 1, 1, 4, 3, 2, 1);
 
-	// Группирует по оргкоду с кластером, метрике с дополнениями и получает таблицу команды
-	cbm_stuff:
-	noconcatenate load
-		org_code, 
-		inic.MetricID,
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue, 
+	// Для первых 5 метрик группирует по ГОСБ с кластером и метрике
+	left join(cbm_stuff) load
+		org_gosb_code, 
 		inic.Cluster,
+		inic.MetricID,
 		// Значение метрики
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
 			Count(If(
 				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
@@ -147,7 +159,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				(inic.Direction = 'Бизнес идеи (КРП)') and
 				(inic.YearReport = 2023) and
 				(inic.ControlDate < '02.02.2024') and 
-				(inic.CreateDate = Date(Today() - 60)),
+				(inic.CreateDate < Date(Today() - 60)),
 				inic.ID
 			)),
 			//10000017
@@ -173,23 +185,13 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
 				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
 				(inic.YearReport = 2023) and
-				((inic.ControlDate >= '02.02.2024') or (inic.ControlDate < '02.02.2025')),
+				((inic.ControlDate >= '02.02.2024') and (inic.ControlDate < '02.02.2025')),
 				inic.ID
 			)) /
-			$(cbmGetClusterMilestone),
-			//10000020
-			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
-			)) /
-			// Считает только коды ГОСБ
-			Count(If(Len(org_code) > 2, org_code))
-		) as inic.MetricValue,
+			$(cbmGetClusterMilestone)
+		) as inic.MetricValueGOSB,
 		// Комментарий
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),
+		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
 			'1)	Количество идей КРП на текущий год: ' &
 			Count(If(
@@ -248,8 +250,30 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				inic.ID
 			)) & ' шт. '& chr(13) &
 			'3)	План КРП на текущий год: ' & 
-			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)',
-			//10000020
+			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)'
+		) as inic.DevElementNameGOSB
+	resident cbm_stuff
+	where (inic.MetricID <> 10000020)
+	group by org_gosb_code, inic.Cluster, inic.MetricID;
+
+	// Для шестой метрики группирует по ТБ
+	left join(cbm_stuff) load
+		org_tb_code, 
+		inic.MetricID, 
+		// Значение метрики 10000020
+		(
+			Count(If(
+				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
+				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
+				(inic.YearReport = 2023) and
+				(inic.ControlDate < '02.02.2024'),
+				inic.ID
+			)) / 
+			// Считает только коды ГОСБ
+			Count(distinct org_gosb_code)
+		) as inic.MetricValueTB,
+		// Комментарий метрики 10000020
+		(
 			'1)	Количество идей КРП на текущий год: ' &
 			Count(If(
 				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
@@ -267,17 +291,16 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				inic.ID
 			)) & ' шт. '& chr(13) &
 			'3)	ГОСБ: ' & 
-			Count(If(Len(org_code) > 2, org_code)) & ' шт.'
-		) as inic.Comment
-	resident cbm_inic
-	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or ((Len(org_code) = 2) and (inic.MetricID = 10000020))
-	group by org_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
+			Count(org_gosb_code) & ' шт.'
+		) as inic.DevElementNameTB
+	resident cbm_stuff
+	where (inic.MetricID = 10000020)
+	group by org_tb_code, inic.MetricID;
 
 	// Создает матрицу ТБ/ГОСБ
 	cbm_mtx:
 	noconcatenate load 
-		org_code,
-		$(cbmGetCluster) as inic.Cluster
+		org_code
 	resident org
 	where not IsNull(org_tb_code);
 
@@ -290,19 +313,14 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	resident cbm_metrics_lookup;
 	drop table cbm_metrics_lookup;
 
-	// Убирает из матрицы неактуальные строки (20 метрика только по ТБ)
-	temp:
-	noconcatenate load * resident cbm_mtx
-	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or 
-		((Len(org_code) = 2) and (inic.MetricID = 10000020));
-	drop table cbm_mtx;
-	rename table temp to cbm_mtx;
-
 	// Добавляет к таблице команды матрицу
 	concatenate(cbm_stuff) load * resident cbm_mtx;
 	drop table cbm_mtx;
 
 	// Сливает таблицу команды с матрицей
+	// Убирает лишние поля и записи
+
+	// !!!!!!!!!!!!!!!!!!!!! Проблема тут !!!!!!!!!!!!!!!!!!
 	temp:
 	noconcatenate load
 		org_code, 
@@ -310,13 +328,15 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
-		inic.Cluster,
-		Sum(inic.MetricValue) as inic.MetricValue,
-		Only(inic.Comment) as inic.Comment
+		Only(inic.MetricValueGOSB) + Only(inic.MetricValueTB) as inic.MetricValue,
+		Only(inic.DevElementNameGOSB) + Only(inic.DevElementNameTB) as inic.DevElementName
 	resident cbm_stuff
-	group by org_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue, inic.Cluster;
+	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or ((Len(org_code) = 2) and (inic.MetricID = 10000020))
+	group by org_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue;
 	drop table cbm_stuff;
 	rename table temp to cbm_stuff;
+drop table org, cbm_inic;
+exit script;
 
 	// Убирает из таблицы инициатив записи с пустым DevElementTitle
 	temp:
@@ -374,8 +394,8 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		inic.MetricName, 
 		inic.MetricDirection, 
 		inic.MetricPlanValue, 
-		inic.MetricValue, 
-		inic.Comment as inic.DevElementName,
+		Coalesce(inic.MetricValue, 0) as inic.MetricValue, 
+		inic.DevElementName,
 		'STUFF' as inic.StructLevel
 	resident cbm_stuff;
 	drop table cbm_stuff;
