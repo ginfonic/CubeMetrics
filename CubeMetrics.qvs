@@ -56,14 +56,14 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
  
 	// Шаблон метрик
 	cbm_metrics_lookup:
-	noconcatenate load * Inline [
+	noconcatenate load * inline [
 		inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue
-		10000015, PL комплексных региональных проектов на текущий год, 1, 1.5
+		10000015, PL комплексных региональных проектов на текущий год, 1, 1.3
 		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
 		10000018, Достаточность КПР для выполнения плана, 1, 1
 		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
-		10000020, Низкое количество идей КРП на ГОСБ, 1, 2
+		10000020, Низкое количество идей КРП на ГОСБ, 1, 0
   ];
 
 	// Добавляет метрики к таблице инициатив
@@ -420,10 +420,10 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	where (
 		(inic.StructLevel = 'STUFF') and 
 		(
-			((inic.MetricID = 10000015) and (inic.MetricValue >= 1.5)) or 
-			((inic.MetricID = 10000017) and (inic.MetricValue > 0)) or 
-			((inic.MetricID = 10000018) and (inic.MetricValue >= 1)) or 
-			((inic.MetricID = 10000019) and (inic.MetricValue >= 0.7)) or
+			((inic.MetricID = 10000015) and (inic.MetricValue >= inic.MetricPlanValue)) or 
+			((inic.MetricID = 10000017) and (inic.MetricValue > inic.MetricPlanValue)) or 
+			((inic.MetricID = 10000018) and (inic.MetricValue >= inic.MetricPlanValue)) or 
+			((inic.MetricID = 10000019) and (inic.MetricValue >= inic.MetricPlanValue)) or
 			(inic.MetricID = 10000020)
 		)
 	)
@@ -445,7 +445,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 	If(not $(ggffIsEmpty(inic.MetricValue)),
 		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
 			// 10000015
-			If(inic.MetricValue < 1.5, 
+			If(inic.MetricValue < inic.MetricPlanValue, 
 				1, 
 				If(inic.MetricValue >= inic.Percentile75,
 					13,
@@ -453,9 +453,9 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				)
 			),
 			// 10000016
-			If(inic.MetricValue > 0, 1, 0), 
+			If(inic.MetricValue > inic.MetricPlanValue, 1, 0), 
 			// 10000017
-			If(inic.MetricValue = 0, 
+			If(inic.MetricValue = inic.MetricPlanValue, 
 				13, 
 				If(inic.MetricValue >= inic.Percentile75,
 					1,
@@ -463,7 +463,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				)
 			),
 			// 10000018
-			If(inic.MetricValue < 1, 
+			If(inic.MetricValue < inic.MetricPlanValue, 
 				1, 
 				If(inic.MetricValue >= inic.Percentile75,
 					13,
@@ -471,7 +471,7 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 				)
 			),
 			// 10000019
-			If(inic.MetricValue < 0.7, 
+			If(inic.MetricValue < inic.MetricPlanValue, 
 				1, 
 				If(inic.MetricValue >= inic.Percentile75,
 					13,
@@ -508,7 +508,8 @@ sub cbmCreateModel(cbm_element_xl, cbm_stuff_xl, tasks_qvd, tasks_xl, org_qvd, o
 		inic.MetricID as METRIC_ID,
 		inic.MetricName as METRIC_NAME,
 		inic.MetricDirection as METRIC_DIRECT,
-		inic.MetricPlanValue as METRIC_PLAN_VALUE,
+		// Делает числом
+		inic.MetricPlanValue * 1 as METRIC_PLAN_VALUE,
 		inic.StructLevel as STRUCT_LEVEL,
 		inic.ReportDate as REPORT_DATE,
 		inic.TBCode as TB_ID,
