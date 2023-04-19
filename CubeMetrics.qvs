@@ -21,43 +21,43 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 	// Таблица инициатив
 	if '$(cbmConnection)' = '1' then
 		//QVD
-		cbm_inic:
+		cbm_data:
 		noconcatenate load
 			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			id as inic.ID,
-			If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as inic.Direction,
-			title as inic.Title,
-			Date(Date#(control_date, 'DD-MM-YYYY')) as inic.ControlDate,
-			Date(Date#(create_date, 'DD-MM-YYYY')) as inic.CreateDate,
-			STATUS as inic.Status,
+			id as cbm.ID,
+			If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as cbm.Direction,
+			title as cbm.Title,
+			Date(Date#(control_date, 'DD-MM-YYYY')) as cbm.ControlDate,
+			Date(Date#(create_date, 'DD-MM-YYYY')) as cbm.CreateDate,
+			STATUS as cbm.Status,
 			If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
 				If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
 					Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
 					Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
 				), 
 				Year(Now())
-			) as inic.YearReport
+			) as cbm.YearReport
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
 	else
 		//Excel
-		cbm_inic:
+		cbm_data:
 		noconcatenate load
 			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			id as inic.ID,
-			If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as inic.Direction,
-			title as inic.Title,
-			Date(Date#(control_date, 'DD-MM-YYYY')) as inic.ControlDate,
-			Date(Date#(create_date, 'DD-MM-YYYY')) as inic.CreateDate,
-			STATUS as inic.Status,
+			id as cbm.ID,
+			If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as cbm.Direction,
+			title as cbm.Title,
+			Date(Date#(control_date, 'DD-MM-YYYY')) as cbm.ControlDate,
+			Date(Date#(create_date, 'DD-MM-YYYY')) as cbm.CreateDate,
+			STATUS as cbm.Status,
 			If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
 				If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
 					Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))),
 					Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
 				), 
 				Year(Now())
-			) as inic.YearReport
+			) as cbm.YearReport
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
@@ -66,31 +66,31 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 	// Таблица отмененных инициатив
 	if '$(cbmConnection)' = '1' then
 		//QVD
-		cbm_inic_cancel:
+		cbm_data_cancel:
 		noconcatenate load
 			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			id as inic.ID,
-			DIRECTION as inic.Direction,
-			title as inic.Title,
-			Date(Date#(control_date, 'DD-MM-YYYY') ) as inic.ControlDate,
-			Date(Date#(create_date, 'DD-MM-YYYY') ) as inic.CreateDate,
-			STATUS as inic.Status,
-			Year(Now()) as inic.YearReport
+			id as cbm.ID,
+			DIRECTION as cbm.Direction,
+			title as cbm.Title,
+			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
+			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
+			STATUS as cbm.Status,
+			Year(Now()) as cbm.YearReport
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
 	else 
 		//Excel
-		cbm_inic_cancel:
+		cbm_data_cancel:
 		noconcatenate load
 			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			id as inic.ID,
-			DIRECTION as inic.Direction,
-			title as inic.Title,
-			Date(Date#(control_date, 'DD-MM-YYYY') ) as inic.ControlDate,
-			Date(Date#(create_date, 'DD-MM-YYYY') ) as inic.CreateDate,
-			STATUS as inic.Status,
-			Year(Now()) as inic.YearReport
+			id as cbm.ID,
+			DIRECTION as cbm.Direction,
+			title as cbm.Title,
+			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
+			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
+			STATUS as cbm.Status,
+			Year(Now()) as cbm.YearReport
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
@@ -99,7 +99,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 	// Шаблон метрик
 	cbm_metrics_lookup:
 	noconcatenate load * inline [
-		inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue
+		cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue
 		10000015, PL комплексных региональных проектов на текущий год, 1, 1.3
 		10000016, Идеи КРП со сроком жизни больше 1 мес., 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
@@ -109,36 +109,36 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
   ];
 
 	// Добавляет метрики к таблице инициатив
-	join(cbm_inic) load * 
+	join(cbm_data) load * 
 	resident cbm_metrics_lookup
-	where inic.MetricID <> 10000017;
+	where cbm.MetricID <> 10000017;
 
 	// Добавляет метрики к таблице отмененных инициатив
-	join(cbm_inic_cancel) load * 
+	join(cbm_data_cancel) load * 
 	resident cbm_metrics_lookup
-	where inic.MetricID = 10000017;
+	where cbm.MetricID = 10000017;
 
 	// Сливает таблицу отмененных инициатив с таблицей инициатив
-	concatenate(cbm_inic) load *
-	resident cbm_inic_cancel;
-	drop table cbm_inic_cancel;
+	concatenate(cbm_data) load *
+	resident cbm_data_cancel;
+	drop table cbm_data_cancel;
 
 	// Создает таблицу команды из таблицы инициатив
 	cbm_stuff:
 	noconcatenate load
 		org_code, 
-		inic.MetricID,
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue,
+		cbm.MetricID,
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue,
 		// Поля для расчета
-		inic.ID,
-		inic.Status,
-		inic.Direction,
-		inic.YearReport,
-		inic.ControlDate,
-		inic.CreateDate
-	resident cbm_inic;
+		cbm.ID,
+		cbm.Status,
+		cbm.Direction,
+		cbm.YearReport,
+		cbm.ControlDate,
+		cbm.CreateDate
+	resident cbm_data;
 
 	// Загружает таблицу оргкодов
 	if '$(cbmConnection)' = '1' then
@@ -183,76 +183,76 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 	noconcatenate load
 		org_code, 
 		org_cluster,
-		inic.MetricID,
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue, 
+		cbm.MetricID,
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue, 
 		// Значение метрики
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
+		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
 			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'Бизнес-эксперименты')) and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'Бизнес-эксперименты')) and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) /
 			$(cbmGetClusterMilestone),
 			//10000016
 			Count(If(
-				(inic.Status = 'В работе') and
-				(inic.Direction = 'Бизнес идеи (КРП)') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024') and 
-				(inic.CreateDate < Date(Today() - 60)),
-				inic.ID
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'Бизнес идеи (КРП)') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024') and 
+				(cbm.CreateDate < Date(Today() - 60)),
+				cbm.ID
 			)),
 			//10000017
 			Count(If(
-				(inic.Status = 'Отменена') and
-				(inic.Direction = 'Бизнес идеи (КРП)') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				(cbm.Status = 'Отменена') and
+				(cbm.Direction = 'Бизнес идеи (КРП)') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) /
 			$(cbmGetClusterMilestone),
 			//10000018
 			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				(inic.Direction = 'КРП') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) /
 			$(cbmGetClusterMilestone),
 			//10000019
 			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
-				(inic.YearReport = 2023) and
-				((inic.ControlDate >= '02.02.2024') and (inic.ControlDate < '02.02.2025')),
-				inic.ID
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)')) and
+				(cbm.YearReport = 2023) and
+				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
+				cbm.ID
 			)) /
 			$(cbmGetClusterMilestone)
-		) as inic.MetricValue,
+		) as cbm.MetricValue,
 		// Комментарий
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
+		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
 			'1)	Количество идей КРП на текущий год: ' &
 			Count(If(
-				(inic.Status = 'В работе') and
-				(inic.Direction = 'Бизнес идеи (КРП)') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'Бизнес идеи (КРП)') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП, реализуемых в текущем году: ' &
 			Count(If(
-				(inic.Status = 'В работе') and
-				(inic.Direction = 'КРП') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
 			//10000016
@@ -262,102 +262,102 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 			//10000018
 			'1)	Количество КРП, реализуемых в текущем году: ' &
 			Count(If(
-				(inic.Status = 'В работе') and
-				(inic.Direction = 'КРП') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП завершенных в текущем году: ' &
 			Count(If(
-				(inic.Status = 'Завершена') and
-				(inic.Direction = 'КРП') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				(cbm.Status = 'Завершена') and
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
 			//10000019
 			'1)	Количество идей КРП на следующий год: ' &
 			Count(If(
-				(inic.Status = 'В работе') and
-				(inic.Direction = 'Бизнес идеи (КРП)') and
-				(inic.YearReport = 2023) and
-				((inic.ControlDate >= '02.02.2024') and (inic.ControlDate < '02.02.2025')),
-				inic.ID
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'Бизнес идеи (КРП)') and
+				(cbm.YearReport = 2023) and
+				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП, реализуемых в следующем году: ' &
 			Count(If(
-				(inic.Status = 'В работе') and
-				(inic.Direction = 'КРП') and
-				(inic.YearReport = 2023) and
-				((inic.ControlDate >= '02.02.2024') and (inic.ControlDate < '02.02.2025')),
-				inic.ID
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2023) and
+				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'3)	План КРП на текущий год: ' & 
 			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)'
-		) as inic.DevElementName
+		) as cbm.DevElementName
 	resident cbm_stuff
-	where not(IsNull(org_gosb_code)) and (inic.MetricID <> 10000020)
-	group by org_code, org_cluster, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue;
+	where not(IsNull(org_gosb_code)) and (cbm.MetricID <> 10000020)
+	group by org_code, org_cluster, cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue;
 
 	// Для шестой метрики группирует по ТБ во вторую таблицу
 	temp2:
 	noconcatenate load
 		org_tb_code, 
-		inic.MetricID, 
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue, 
+		cbm.MetricID, 
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue, 
 		// Значение метрики 10000020
 		(
 			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				((inic.Direction = 'КРП') or (inic.Direction = 'Бизнес идеи (КРП)')) and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)')) and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) / 
 			// Считает только коды ГОСБ
 			Count(distinct org_gosb_code)
-		) as inic.MetricValue,
+		) as cbm.MetricValue,
 		// Комментарий метрики 10000020
 		(
 			'1)	Количество идей КРП на текущий год: ' &
 			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				(inic.Direction = 'Бизнес идеи (КРП)') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				(cbm.Direction = 'Бизнес идеи (КРП)') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП в текущем году в статусе реализуется и завершена: '&
 			Count(If(
-				((inic.Status = 'Завершена') or (inic.Status = 'В работе')) and
-				(inic.Direction = 'КРП') and
-				(inic.YearReport = 2023) and
-				(inic.ControlDate < '02.02.2024'),
-				inic.ID
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'3)	ГОСБ: ' & 
 			Count(distinct org_gosb_code) & ' шт.'
-		) as inic.DevElementName,
+		) as cbm.DevElementName,
 		org_tb_code as org_code
 	resident cbm_stuff
-	where not(IsNull(org_tb_code)) and (inic.MetricID = 10000020)
-	group by org_tb_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue;
+	where not(IsNull(org_tb_code)) and (cbm.MetricID = 10000020)
+	group by org_tb_code, cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue;
 	drop table cbm_stuff;
 	rename table temp1 to cbm_stuff;
 
 	// Сливает обе таблицы в готовую таблицу команды
 	concatenate(cbm_stuff) load
 		org_code,
-		inic.MetricID, 
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue,
-		inic.MetricValue,
-		inic.DevElementName
+		cbm.MetricID, 
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue,
+		cbm.MetricValue,
+		cbm.DevElementName
 	resident temp2;
 	drop table temp2;
 
@@ -370,203 +370,203 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 
 	// Добавляет к матрице метрики
 	join(cbm_mtx) load 
-		inic.MetricID, 
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue
+		cbm.MetricID, 
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue
 	resident cbm_metrics_lookup;
 	drop table cbm_metrics_lookup;
 
 	// Добавляет к таблице команды нужную часть матрицы
 	concatenate(cbm_stuff) load * resident cbm_mtx
-	where ((Len(org_code) > 2) and (inic.MetricID <> 10000020)) or 
-		((Len(org_code) = 2) and (inic.MetricID = 10000020));
+	where ((Len(org_code) > 2) and (cbm.MetricID <> 10000020)) or 
+		((Len(org_code) = 2) and (cbm.MetricID = 10000020));
 	drop table cbm_mtx;
 
 	// Сливает таблицу команды с матрицей
 	temp:
 	noconcatenate load
 		org_code, 
-		inic.MetricID, 
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue, 
-		Sum(inic.MetricValue) as inic.MetricValue,
-		Only(inic.DevElementName) as inic.DevElementName
+		cbm.MetricID, 
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue, 
+		Sum(cbm.MetricValue) as cbm.MetricValue,
+		Only(cbm.DevElementName) as cbm.DevElementName
 	resident cbm_stuff
-	group by org_code, inic.MetricID, inic.MetricName, inic.MetricDirection, inic.MetricPlanValue;
+	group by org_code, cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue;
 	drop table cbm_stuff;
 	rename table temp to cbm_stuff;
 
 	// Убирает из таблицы инициатив записи с пустым DevElementTitle
 	temp:
-	noconcatenate load * where not(IsNull(inic.DevElementName));
+	noconcatenate load * where not(IsNull(cbm.DevElementName));
 	// Добавляет в таблицу инициатив нужные поля, удаляя ненужные
 	noconcatenate load
 		org_code,
-		inic.MetricID, 
-		inic.MetricName, 
-		inic.MetricDirection, 
-		inic.MetricPlanValue, 
-		'ELEMENT' as inic.StructLevel,
+		cbm.MetricID, 
+		cbm.MetricName, 
+		cbm.MetricDirection, 
+		cbm.MetricPlanValue, 
+		'ELEMENT' as cbm.StructLevel,
 		// Имя элемента
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
+		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
-			If(((inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'КРП')) and 
-					((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
-					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')),
-				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status
+			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП')) and 
+					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
+					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
+				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status
 			),
 			//10000016
-			If((inic.Direction = 'Бизнес идеи (КРП)') and (inic.Status = 'В работе') and 
-					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')) and 
-					(inic.CreateDate < Date(Today() - 60)),
-				inic.Title & ', дата создания: ' & inic.CreateDate & ' (в ожидании ' & (Today() - inic.CreateDate) & ' дн.)'),
+			If((cbm.Direction = 'Бизнес идеи (КРП)') and (cbm.Status = 'В работе') and 
+					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')) and 
+					(cbm.CreateDate < Date(Today() - 60)),
+				cbm.Title & ', дата создания: ' & cbm.CreateDate & ' (в ожидании ' & (Today() - cbm.CreateDate) & ' дн.)'),
 			//10000017
-			If((inic.Direction = 'Бизнес идеи (КРП)') and (inic.Status = 'Отменена') and 
-					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')),
-				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status),
+			If((cbm.Direction = 'Бизнес идеи (КРП)') and (cbm.Status = 'Отменена') and 
+					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
+				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
 			//10000018
-			If((inic.Direction = 'КРП') and ((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
-					(inic.YearReport = '2023') and (inic.ControlDate < Date('02.02.2024')),
-				inic.Direction & ': '& inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status),
+			If((cbm.Direction = 'КРП') and ((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
+					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
+				cbm.Direction & ': '& cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
 			//10000019
-			If(((inic.Direction = 'Бизнес идеи (КРП)') or (inic.Direction = 'КРП')) and 
-					((inic.Status = 'В работе') or (inic.Status = 'Завершена')) and 
-					(inic.YearReport = '2023') and (inic.ControlDate > Date('02.02.2024')) and (inic.ControlDate < Date('02.02.2025')),
-				inic.Direction & ': ' & inic.Title & ', срок: ' & inic.ControlDate & ', статус: ' & inic.Status)
-		) as inic.DevElementName
-	resident cbm_inic;
-	drop table cbm_inic;
-	rename table temp to cbm_inic;
+			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП')) and 
+					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
+					(cbm.YearReport = '2023') and (cbm.ControlDate > Date('02.02.2024')) and (cbm.ControlDate < Date('02.02.2025')),
+				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status)
+		) as cbm.DevElementName
+	resident cbm_data;
+	drop table cbm_data;
+	rename table temp to cbm_data;
 
 	// Добавляет в таблицу инициатив значение метрики из таблицы команды
-	left join(cbm_inic) load
+	left join(cbm_data) load
 		org_code,
-		inic.MetricID,
-		inic.MetricValue
+		cbm.MetricID,
+		cbm.MetricValue
 	resident cbm_stuff;
 
 	// Сливает таблицу команды с таблицей инициатив
-	concatenate(cbm_inic) load *, 
-		'STUFF' as inic.StructLevel
+	concatenate(cbm_data) load *, 
+		'STUFF' as cbm.StructLevel
 	resident cbm_stuff;
 	drop table cbm_stuff;
 
 	// Расчитывает значение перцентилей 0,75 и 0,25
-	left join(cbm_inic) load
-		inic.MetricID,
-		Fractile(inic.MetricValue, 0.75) as inic.Percentile75,
-		Fractile(inic.MetricValue, 0.25) as inic.Percentile25
-	resident cbm_inic
+	left join(cbm_data) load
+		cbm.MetricID,
+		Fractile(cbm.MetricValue, 0.75) as cbm.Percentile75,
+		Fractile(cbm.MetricValue, 0.25) as cbm.Percentile25
+	resident cbm_data
 	where (
-		(inic.StructLevel = 'STUFF') and 
+		(cbm.StructLevel = 'STUFF') and 
 		(
-			((inic.MetricID = 10000015) and (inic.MetricValue >= inic.MetricPlanValue)) or 
-			((inic.MetricID = 10000017) and (inic.MetricValue > inic.MetricPlanValue)) or 
-			((inic.MetricID = 10000018) and (inic.MetricValue >= inic.MetricPlanValue)) or 
-			((inic.MetricID = 10000019) and (inic.MetricValue >= inic.MetricPlanValue)) or
-			(inic.MetricID = 10000020)
+			((cbm.MetricID = 10000015) and (cbm.MetricValue >= cbm.MetricPlanValue)) or 
+			((cbm.MetricID = 10000017) and (cbm.MetricValue > cbm.MetricPlanValue)) or 
+			((cbm.MetricID = 10000018) and (cbm.MetricValue >= cbm.MetricPlanValue)) or 
+			((cbm.MetricID = 10000019) and (cbm.MetricValue >= cbm.MetricPlanValue)) or
+			(cbm.MetricID = 10000020)
 		)
 	)
-	group by inic.MetricID;
+	group by cbm.MetricID;
 
 	temp:
 	noconcatenate load *,
 	// Добавляет пустые и стандартные поля
-	Null() as inic.ElementType, 
-	Null() as inic.ElementID,
-	'EXT_FILE' as inic.Segment,
-	Date(Floor($(cbmGetPrevMEnd))) as inic.ReportDate,
+	Null() as cbm.ElementType, 
+	Null() as cbm.ElementID,
+	'EXT_FILE' as cbm.Segment,
+	Date(Floor($(cbmGetPrevMEnd))) as cbm.ReportDate,
 	// Рассчитывает поле LOAD_ID из метрики и текущей даты
-	If((inic.MetricID = 10000018) or (inic.MetricID = 10000019),
-		inic.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
-		inic.MetricID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
-	) as inic.LoadID, 
+	If((cbm.MetricID = 10000018) or (cbm.MetricID = 10000019),
+		cbm.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
+		cbm.MetricID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
+	) as cbm.LoadID, 
 	// Рассчитывает поле DEVIATION_MARKER
-	If(not $(ggffIsEmpty(inic.MetricValue)),
-		Pick(Match(inic.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+	If(not $(ggffIsEmpty(cbm.MetricValue)),
+		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
 			// 10000015
-			If(inic.MetricValue < inic.MetricPlanValue, 
+			If(cbm.MetricValue < cbm.MetricPlanValue, 
 				1, 
-				If(inic.MetricValue >= inic.Percentile75,
+				If(cbm.MetricValue >= cbm.Percentile75,
 					13,
 					0
 				)
 			),
 			// 10000016
-			If(inic.MetricValue > inic.MetricPlanValue, 1, 0), 
+			If(cbm.MetricValue > cbm.MetricPlanValue, 1, 0), 
 			// 10000017
-			If(inic.MetricValue = inic.MetricPlanValue, 
+			If(cbm.MetricValue = cbm.MetricPlanValue, 
 				13, 
-				If(inic.MetricValue >= inic.Percentile75,
+				If(cbm.MetricValue >= cbm.Percentile75,
 					1,
 					0
 				)
 			),
 			// 10000018
-			If(inic.MetricValue < inic.MetricPlanValue, 
+			If(cbm.MetricValue < cbm.MetricPlanValue, 
 				1, 
-				If(inic.MetricValue >= inic.Percentile75,
+				If(cbm.MetricValue >= cbm.Percentile75,
 					13,
 					0
 				)
 			),
 			// 10000019
-			If(inic.MetricValue < inic.MetricPlanValue, 
+			If(cbm.MetricValue < cbm.MetricPlanValue, 
 				1, 
-				If(inic.MetricValue >= inic.Percentile75,
+				If(cbm.MetricValue >= cbm.Percentile75,
 					13,
 					0
 				)
 			),
 			// 10000020
-			If(inic.MetricValue >= inic.Percentile75, 
+			If(cbm.MetricValue >= cbm.Percentile75, 
 				13, 
-				If(inic.MetricValue <= inic.Percentile25,
+				If(cbm.MetricValue <= cbm.Percentile25,
 					1,
 					0
 				)
 			))
-		) as inic.DeviationMarker
-	resident cbm_inic;
-	drop table cbm_inic;
-	rename table temp to cbm_inic;
-	drop fields inic.Percentile75, inic.Percentile25;
+		) as cbm.DeviationMarker
+	resident cbm_data;
+	drop table cbm_data;
+	rename table temp to cbm_data;
+	drop fields cbm.Percentile75, cbm.Percentile25;
 
 	//Добавляет параметры ГОСБ
-	left join(cbm_inic) load
+	left join(cbm_data) load
 		org_code,
-		org_tb_code as inic.TBCode,
-		org_gosb_code as inic.GOSBCode,
-		org_tb_name as inic.TBName,
-		org_gosb_name as inic.GOSBName
+		org_tb_code as cbm.TBCode,
+		org_gosb_code as cbm.GOSBCode,
+		org_tb_name as cbm.TBName,
+		org_gosb_name as cbm.GOSBName
 	resident org;
 	drop table org;
 
 	// Меняет названия столбцов на нужные
-	cbm_data:
-	noconcatenate load 
-		inic.MetricID as METRIC_ID,
-		inic.MetricName as METRIC_NAME,
-		inic.MetricDirection as METRIC_DIRECT,
-		// Делает числом
-		inic.MetricPlanValue * 1 as METRIC_PLAN_VALUE,
-		inic.StructLevel as STRUCT_LEVEL,
-		inic.ReportDate as REPORT_DATE,
-		inic.TBCode as TB_ID,
-		inic.TBName as TB_NAME,
-		inic.GOSBCode as GOSB_ID,
-		inic.GOSBName as GOSB_NAME,
-		inic.DevElementName as DEV_ELEMENT_NAME,
-		inic.MetricValue as METRIC_VALUE,
-		inic.ElementType as ELEMENT_TYPE,
-		inic.ElementID as ELEMENT_ID,
-		inic.Segment as SEGMENT,
-		inic.LoadID as LOAD_ID,
-		inic.DeviationMarker as DEVIATION_MARKER
-	resident cbm_inic;
-	drop table cbm_inic;
+	// cbm_out:
+	// noconcatenate load 
+	// 	cbm.MetricID as METRIC_ID,
+	// 	cbm.MetricName as METRIC_NAME,
+	// 	cbm.MetricDirection as METRIC_DIRECT,
+	// 	// Делает числом
+	// 	cbm.MetricPlanValue * 1 as METRIC_PLAN_VALUE,
+	// 	cbm.StructLevel as STRUCT_LEVEL,
+	// 	cbm.ReportDate as REPORT_DATE,
+	// 	cbm.TBCode as TB_ID,
+	// 	cbm.TBName as TB_NAME,
+	// 	cbm.GOSBCode as GOSB_ID,
+	// 	cbm.GOSBName as GOSB_NAME,
+	// 	cbm.DevElementName as DEV_ELEMENT_NAME,
+	// 	cbm.MetricValue as METRIC_VALUE,
+	// 	cbm.ElementType as ELEMENT_TYPE,
+	// 	cbm.ElementID as ELEMENT_ID,
+	// 	cbm.Segment as SEGMENT,
+	// 	cbm.LoadID as LOAD_ID,
+	// 	cbm.DeviationMarker as DEVIATION_MARKER
+	// resident cbm_data;
+	// drop table cbm_data;
 
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////
