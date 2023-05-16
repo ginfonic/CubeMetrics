@@ -176,7 +176,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 	resident org;
 
 	// Ориентир, исходя из кластера ГОСБ
-	set cbmGetClusterMilestone = Pick(Match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4') + 1, 1, 4, 3, 2, 1);
+	set cbmGetClusterMilestone = Pick(Match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4', 'Группа 5') + 1, 0, 4, 3, 2, 2, 1);
 
 	// Для первых 5 метрик группирует по ГОСБ с кластером и метрике в первую таблицу
 	temp1:
