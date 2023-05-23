@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -11,7 +11,7 @@ sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
+sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, org_qvd, org_xl)
 	// Выражения расчета необходимых дат
 	set cbmGetPrevMStart = MonthStart(AddMonths(Today(), -1));
 	set cbmGetPrevMEnd = MonthEnd(AddMonths(Today(), -1));
@@ -40,6 +40,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	else
 		//Excel
 		cbm_data:
@@ -61,6 +64,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
 	// Таблица отмененных инициатив
@@ -79,6 +85,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	else 
 		//Excel
 		cbm_data_cancel:
@@ -94,6 +103,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
 	// Шаблон метрик
@@ -153,6 +165,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 			org_cluster
 		from [$(org_qvd)] (qvd)
 		where (org_tb_code <> 38) and (org_gosb_code <> 9052);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	else
 		//Excel
 		org:
@@ -165,6 +180,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 			$(ggffT2N(org_cluster)) as org_cluster
 		from [$(org_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (org_tb_code <> 38) and (org_gosb_code <> 9052);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
 	// Добавляет к таблице команды данные из таблицы оргкодов
@@ -473,62 +491,62 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 
 	temp:
 	noconcatenate load *,
-	// Добавляет пустые и стандартные поля
-	Null() as cbm.ElementType, 
-	Null() as cbm.ElementID,
-	'EXT_FILE' as cbm.Segment,
-	Date(Floor($(cbmGetPrevMEnd))) as cbm.ReportDate,
-	// Рассчитывает поле LOAD_ID из метрики и текущей даты
-	If((cbm.MetricID = 10000018) or (cbm.MetricID = 10000019),
-		cbm.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
-		cbm.MetricID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
-	) as cbm.LoadID, 
-	// Рассчитывает поле DEVIATION_MARKER
-	If(not $(ggffIsEmpty(cbm.MetricValue)),
-		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-			// 10000015
-			If(cbm.MetricValue < cbm.MetricPlanValue, 
-				1, 
-				If(cbm.MetricValue >= cbm.Percentile75,
-					13,
-					0
-				)
-			),
-			// 10000016
-			If(cbm.MetricValue > cbm.MetricPlanValue, 1, 0), 
-			// 10000017
-			If(cbm.MetricValue = cbm.MetricPlanValue, 
-				13, 
-				If(cbm.MetricValue >= cbm.Percentile75,
-					1,
-					0
-				)
-			),
-			// 10000018
-			If(cbm.MetricValue < cbm.MetricPlanValue, 
-				1, 
-				If(cbm.MetricValue >= cbm.Percentile75,
-					13,
-					0
-				)
-			),
-			// 10000019
-			If(cbm.MetricValue < cbm.MetricPlanValue, 
-				1, 
-				If(cbm.MetricValue >= cbm.Percentile75,
-					13,
-					0
-				)
-			),
-			// 10000020
-			If(cbm.MetricValue >= cbm.Percentile75, 
-				13, 
-				If(cbm.MetricValue <= cbm.Percentile25,
-					1,
-					0
-				)
-			))
-		) as cbm.DeviationMarker
+		// Добавляет пустые и стандартные поля
+		Null() as cbm.ElementType, 
+		Null() as cbm.ElementID,
+		'EXT_FILE' as cbm.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm.ReportDate,
+		// Рассчитывает поле LOAD_ID из метрики и текущей даты
+		If((cbm.MetricID = 10000018) or (cbm.MetricID = 10000019),
+			cbm.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD'),
+			cbm.MetricID&'_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD')
+		) as cbm.LoadID, 
+		// Рассчитывает поле DEVIATION_MARKER
+		If(not $(ggffIsEmpty(cbm.MetricValue)),
+			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+				// 10000015
+				If(cbm.MetricValue < cbm.MetricPlanValue, 
+					1, 
+					If(cbm.MetricValue >= cbm.Percentile75,
+						13,
+						0
+					)
+				),
+				// 10000016
+				If(cbm.MetricValue > cbm.MetricPlanValue, 1, 0), 
+				// 10000017
+				If(cbm.MetricValue = cbm.MetricPlanValue, 
+					13, 
+					If(cbm.MetricValue >= cbm.Percentile75,
+						1,
+						0
+					)
+				),
+				// 10000018
+				If(cbm.MetricValue < cbm.MetricPlanValue, 
+					1, 
+					If(cbm.MetricValue >= cbm.Percentile75,
+						13,
+						0
+					)
+				),
+				// 10000019
+				If(cbm.MetricValue < cbm.MetricPlanValue, 
+					1, 
+					If(cbm.MetricValue >= cbm.Percentile75,
+						13,
+						0
+					)
+				),
+				// 10000020
+				If(cbm.MetricValue >= cbm.Percentile75, 
+					13, 
+					If(cbm.MetricValue <= cbm.Percentile25,
+						1,
+						0
+					)
+				))
+			) as cbm.DeviationMarker
 	resident cbm_data;
 	drop table cbm_data;
 	rename table temp to cbm_data;
@@ -543,6 +561,248 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, org_qvd, org_xl)
 		org_gosb_name as cbm.GOSBName
 	resident org;
 	drop table org;
+
+	////////////////////////////////////////////////////////////////////////////////
+	//Данные с платформы
+
+	// Справочник допустимых продуктов
+	product_lookup:
+	noconcatenate load * inline [
+		product_id
+		25
+		101
+		115
+		162
+		165
+		166
+		168
+		169
+		175
+		176
+		185
+		220
+		226
+		227
+		228
+		229
+		230
+		231
+		232
+		233
+		234
+		235
+	];
+
+	///////////////////////////////////////////////////////////////////////////
+	// Получает продукты
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		products:
+		noconcatenate load  
+			id as product_id,
+			// crm_id,
+			name as product
+			// dzo,
+			// status,
+			// segment,
+			// industry as industry,
+			// role_upr,
+			// description,
+			// visible,
+			// create_date,
+			// update_date,
+			// draft,
+			// tb,
+			// gosb,
+			// metric,
+			// "group",
+			// attachment,
+			// "type",
+			// consist		
+		from [$(fbs_prd_qvd)] (qvd)
+		//Только тираж
+		where (status = 'Тираж');
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		products:
+		noconcatenate load 
+		  // attachment,
+			// consist,
+			// create_date,
+			// crm_id,
+			// description,
+			// draft,
+			// dzo,
+			// gosb,
+			// "group",
+			id as product_id,
+			// industry as industry,
+			// metric,
+			name as product
+			// role_upr,
+			// segment,
+			// status,
+			// tb,
+			// "type",
+			// update_date,
+			// visible
+		from [$(fbs_prd_xl)] (ooxml, embedded labels, table is Sheet1)
+		//Только тираж
+		where (status = 'Тираж');
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	//Добавляет поля из загруженного справочника в справочник продуктов
+	left join(product_lookup) load
+		product_id,
+		product
+	resident products;
+	drop table products;
+
+	//Условия непустых записей
+	set cbmNotEmptyRecords = 
+		not(IsNull($1)) and ($1 <> '') and ($1 <> '-') and 
+		not(IsNull($2)) and ($2 <> '') and ($2 <> '-') and 
+		not(IsNull($3)) and ($3 <> '') and ($3 <> '-');
+
+	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года (весь прошлый год, если первый квартал)
+	//$1 - год, $2 - квартал
+	// set cbmIsPrevQ = 
+	// 	If($(ggffQuarterNo(Today())) = 1,
+	// 		($1 = Year(Today()) - 1),
+	// 		(($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today()))))
+	// 	);
+	set cbmIsPrevQ = 
+		If($(ggffQuarterNo('10.02.2024')) = 1,
+			($1 = Year('10.02.2024') - 1),
+			(($1 = Year('10.02.2024')) and ($2 < $(ggffQuarterNo('10.02.2024'))))
+		);
+
+	//Получает данные
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_fbs:
+		noconcatenate load
+			// tb_code,
+			// tb,
+			// gosb_code,
+			// gosb,
+			$(ggffCreateOrgCode(tb_code, gosb_code)) as org_code,
+			// "type",
+			// basket_id,
+			product as cbm_fbs.Product,
+			// If(IsNull(city) or (city = '') or (city = '-'),
+			// 	'ГОСБ',
+			// 	city 
+			// ) as cbm_fbs.City,
+			// initiative_id,
+			// chain,
+			// object,
+			// id_basket_item,
+			plan as cbm_fbs.Plan
+			// "fact" as cbm_fbs.Fact,
+			// "year",
+			// quarter,
+			// $(ggffGetDateFromQY(quarter, "year")) as cbm_fbs.Date,
+			// status as cbm_fbs.Status,
+			// income as cbm_fbs.IncomeFact,
+			// income_plan as cbm_fbs.IncomePlan,
+			// template_id as cbm_fbs.TemplateID,
+  		// template_title as cbm_fbs.TemplateTitle,
+			// "comment" as cbm_fbs.Comments,
+			// // "max",
+			// Date(create_date) as cbm_fbs.CreateDate,
+			// Date(update_date) as cbm_fbs.UpdateDate
+		from [$(fbs_qvd)] (qvd)
+		//Только не пустые значения прошлых кварталов со статусом Запланировано или Реализовано 
+		where $(cbmNotEmptyRecords(tb_code, gosb_code, product)) and $(cbmIsPrevQ("year", quarter)) and 
+			((status = 127) or (status = 128) or (status = 129) or (status = 130) or (status = 131) or (status = 134) or (status = 777));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		cbm_fbs:
+		noconcatenate load 
+			// tb_code,
+			// tb,
+			// gosb_code,
+			// gosb,
+			$(ggffCreateOrgCode(tb_code, gosb_code)) as org_code,
+			// "type",
+			// basket_id,
+			product as cbm_fbs.Product,
+			// If(IsNull(city) or (city = '') or (city = '-'),
+			// 	'ГОСБ',
+			// 	city 
+			// ) as cbm_fbs.City,
+			// initiative_id,
+			// "max",
+			// chain,
+			// object,
+			// id_basket_item,
+			plan as cbm_fbs.Plan
+			// "fact" as cbm_fbs.Fact,
+			// "year",
+			// quarter,
+			// $(ggffGetDateFromQY(quarter, "year")) as cbm_fbs.Date,
+			// status as cbm_fbs.Status,
+			// income as cbm_fbs.IncomeFact,
+			// income_plan as cbm_fbs.IncomePlan,
+			// If("comment" = '-', '', "comment") as cbm_fbs.Comments,
+			// Date(create_date) as cbm_fbs.CreateDate,
+			// Date(update_date) as cbm_fbs.UpdateDate,
+			// template_id as cbm_fbs.TemplateID,
+  		// template_title as cbm_fbs.TemplateTitle
+		from [$(fbs_xl)] (ooxml, embedded labels, table is Sheet1)
+		//Только не пустые значения прошлых кварталов со статусом Запланировано или Реализовано 
+		where $(cbmNotEmptyRecords(tb_code, gosb_code, product)) and ($(cbmIsPrevQ("year", quarter))) and 
+			((status = 127) or (status = 128) or (status = 129) or (status = 130) or (status = 131) or (status = 134) or (status = 777));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	//Добавляет в основную таблицу поле из справочников
+	left join(cbm_fbs) load
+		product as cbm_fbs.Product,
+		product_id as cbm_fbs.ProductID
+	resident product_lookup;
+	drop table product_lookup;
+
+	//Сливает записи по оргкоду
+	//Убирает из таблицы записи с продуктами не из справочника
+	temp:
+	noconcatenate load 
+		org_code,
+		Sum(cbm_fbs.Plan) as cbm_fbs.Plan
+	resident cbm_fbs
+	where not(IsNull(cbm_fbs.ProductID))
+	group by org_code;
+	drop table cbm_fbs;
+	rename table temp to cbm_fbs;
+
+	//Получает данные ориентира
+	right join(cbm_fbs) load
+		// tb,
+    // gosb,
+    org_code,
+		// Pick(Match($(ggffQuarterNo(Today()))&Year(Today()), '32023', '42023', '12024') + 1,
+		// 	0, "2 кв", "3 кв", "4 кв"
+		// ) as cbm_fbs.Milestone
+		Sum(Pick(Match($(ggffQuarterNo('10.02.2024'))&Year('10.02.2024'), '32023', '42023', '12024') + 1,
+			0, "2 кв", "3 кв", "4 кв"
+		)) as cbm_fbs.Milestone
+	from [$(fbs_mls_xl)]
+	(ooxml, embedded labels, table is Sheet1)
+	group by org_code;
+
+	////////////////////////////////////////////////////////////////////////////////
 
 	// Меняет названия столбцов на нужные
 	// cbm_out:
