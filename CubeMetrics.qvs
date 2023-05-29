@@ -682,6 +682,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	// 		($1 = Year('10.02.2024') - 1),
 	// 		(($1 = Year('10.02.2024')) and ($2 < $(ggffQuarterNo('10.02.2024'))))
 	// 	);
+	// Проверяет год записи, текущий ли это год: 1 - год
+	set cbmIsThisYear = ($1 = Year(Today()));
+	// Проверяет квартал записи, четвертый ли он текущего года: $1 - год, $2 - квартал
+	set sbmIs4QThisYear = (($1 = Year(Today())) and ($2 = 4));
 
 	//Получает данные
 	if '$(cbmConnection)' = '1' then
@@ -704,7 +708,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// chain,
 			// object,
 			// id_basket_item,
-			plan as cbm_fbs.Plan
+			If($(cbmIsPrevQ("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
+			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
+			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear
 			// "fact" as cbm_fbs.Fact,
 			// "year",
 			// quarter,
@@ -719,8 +725,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// Date(create_date) as cbm_fbs.CreateDate,
 			// Date(update_date) as cbm_fbs.UpdateDate
 		from [$(fbs_qvd)] (qvd)
-		//Только не пустые значения прошлых кварталов со статусом Запланировано или Реализовано 
-		where $(cbmNotEmptyRecords(tb_code, gosb_code, product)) and $(cbmIsPrevQ("year", quarter)) and 
+		//Только не пустые значения со статусом Запланировано или Реализовано 
+		where $(cbmNotEmptyRecords(tb_code, gosb_code, product)) and 
 			((status = 127) or (status = 128) or (status = 129) or (status = 130) or (status = 131) or (status = 134) or (status = 777));
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
@@ -746,7 +752,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// chain,
 			// object,
 			// id_basket_item,
-			plan as cbm_fbs.Plan
+			If($(cbmIsPrevQ("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
+			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
+			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear
 			// "fact" as cbm_fbs.Fact,
 			// "year",
 			// quarter,
@@ -760,15 +768,18 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// template_id as cbm_fbs.TemplateID,
   		// template_title as cbm_fbs.TemplateTitle
 		from [$(fbs_xl)] (ooxml, embedded labels, table is Sheet1)
-		//Только не пустые значения прошлых кварталов со статусом Запланировано или Реализовано 
-		where $(cbmNotEmptyRecords(tb_code, gosb_code, product)) and ($(cbmIsPrevQ("year", quarter))) and 
+		//Только не пустые значения со статусом Запланировано или Реализовано 
+		where $(cbmNotEmptyRecords(tb_code, gosb_code, product)) and 
 			((status = 127) or (status = 128) or (status = 129) or (status = 130) or (status = 131) or (status = 134) or (status = 777));
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
-	//Добавляет в основную таблицу поле из справочников
+	// Добавляет к таблице данные из таблицы оргкодов
+	left join (cbm_fbs) load org_code resident org;
+
+	//Добавляет в основную таблицу ID продукта из справочника
 	left join(cbm_fbs) load
 		product as cbm_fbs.Product,
 		product_id as cbm_fbs.ProductID
@@ -780,73 +791,12 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	temp:
 	noconcatenate load 
 		org_code,
-		Sum(cbm_fbs.Plan) as cbm_fbs.Plan
+		Sum(cbm_fbs.PlanProgPrevQuarters) as cbm_fbs.PlanProgPrevQuarters,
+		Sum(cbm_fbs.Plan4QThisYear) as cbm_fbs.Plan4QThisYear,
+		Sum(cbm_fbs.PlanThisYear) as cbm_fbs.PlanThisYear
 	resident cbm_fbs
-	where not(IsNull(cbm_fbs.ProductID))
+	where not(IsNull(cbm_fbs.ProductID)) and (org_code <> 3838) and (org_code <> 529052)
 	group by org_code;
-	drop table cbm_fbs;
-	rename table temp to cbm_fbs;
-
-	//Получает данные ориентира
-	right join(cbm_fbs) load
-		// tb,
-    // gosb,
-    org_code,
-		Sum(Pick(Match($(ggffQuarterNo(Today()))&Year(Today()), '32023', '42023', '12024') + 1,
-			0, "2 кв", "3 кв", "4 кв"
-		)) as cbm_fbs.Milestone
-		// Sum(Pick(Match($(ggffQuarterNo('10.02.2024'))&Year('10.02.2024'), '32023', '42023', '12024') + 1,
-		// 	0, "2 кв", "3 кв", "4 кв"
-		// )) as cbm_fbs.Milestone
-	from [$(fbs_mls_xl)]
-	(ooxml, embedded labels, table is Sheet1)
-	group by org_code;
-
-	// Получает значение метрики
-	temp:
-	noconcatenate load *,
-		10000021 as cbm_fbs.MetricID,
-		'Достаточность PL продаж продуктов полки' as cbm_fbs.MetricName,
-		1 as cbm_fbs.MetricDirection,
-		1.1 as cbm_fbs.MetricPlanValue,
-		Null() as cbm_fbs.ElementType, 
-		Null() as cbm_fbs.ElementID,
-		'EXT_FILE' as cbm_fbs.Segment,
-		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
-		'STUFF' as cbm_fbs.StructLevel,
-		'Числитель - '&cbm_fbs.PlanZeroed&', знаменатель - '&cbm_fbs.Milestone as cbm_fbs.DevElementName,
-		If((cbm_fbs.Milestone > 0), 
-			cbm_fbs.PlanZeroed / cbm_fbs.Milestone,
-			// Если нет ориентира, то выше границы плана
-			1.11
-		) as cbm_fbs.MetricValue;
-	noconcatenate load *,
-		// Делает план нулевым при его отсутствии
-		coalesce(cbm_fbs.Plan, 0) as cbm_fbs.PlanZeroed
-	resident cbm_fbs
-	// Отсекаем Москву и Крым
-	where (org_code <> 3838) and (org_code <> 529052);
-	drop table cbm_fbs;
-	rename table temp to cbm_fbs;
-
-	// Расчитывает значение перцентиля 0,75
-	left join(cbm_fbs) load
-		Fractile(cbm_fbs.MetricValue, 0.75) as cbm_fbs.Percentile75
-	resident cbm_fbs
-	where (cbm_fbs.MetricValue >= cbm_fbs.MetricPlanValue);
-
-	// Добавляет поля DeviationMarker и LoadID
-	temp:
-	noconcatenate load *,
-		If((cbm_fbs.MetricValue < cbm_fbs.MetricPlanValue), 
-			1, 
-			If((cbm_fbs.MetricValue >= cbm_fbs.Percentile75),
-				13,
-				0
-			)
-		) as cbm_fbs.DeviationMarker,
-		cbm_fbs.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID
-	resident cbm_fbs;
 	drop table cbm_fbs;
 	rename table temp to cbm_fbs;
 
@@ -860,7 +810,68 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	resident org;
 	drop table org;
 
-	// Сливает данные с платформы с основной таблицей
+	// Выделяет таблицу метрики 10000021
+	cbm_fbs_10000021:
+	noconcatenate load * resident cbm_fbs;
+
+	//Добавляет данные ориентира
+	left join(cbm_fbs_10000021) load
+    org_code,
+		Sum(Pick(Match($(ggffQuarterNo(Today()))&Year(Today()), '32023', '42023', '12024') + 1,
+			0, "2 кв", "3 кв", "4 кв"
+		)) as cbm_fbs.Milestone
+		// Sum(Pick(Match($(ggffQuarterNo('10.02.2024'))&Year('10.02.2024'), '32023', '42023', '12024') + 1,
+		// 	0, "2 кв", "3 кв", "4 кв"
+		// )) as cbm_fbs.Milestone
+	from [$(fbs_mls_xl)]
+	(ooxml, embedded labels, table is Sheet1)
+	where (org_code <> 3838) and (org_code <> 529052)
+	group by org_code;
+
+	// Получает значение метрики 10000021
+	temp:
+	noconcatenate load *,
+		10000021 as cbm_fbs.MetricID,
+		'Достаточность PL продаж продуктов полки' as cbm_fbs.MetricName,
+		1 as cbm_fbs.MetricDirection,
+		1.1 as cbm_fbs.MetricPlanValue,
+		Null() as cbm_fbs.ElementType, 
+		Null() as cbm_fbs.ElementID,
+		'EXT_FILE' as cbm_fbs.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
+		'STUFF' as cbm_fbs.StructLevel,
+		'Числитель - '&cbm_fbs.PlanProgPrevQuarters&', знаменатель - '&cbm_fbs.Milestone as cbm_fbs.DevElementName,
+		If((cbm_fbs.Milestone > 0), 
+			cbm_fbs.PlanProgPrevQuarters / cbm_fbs.Milestone,
+			// Если нет ориентира, то выше границы плана
+			1.11
+		) as cbm_fbs.MetricValue
+	resident cbm_fbs_10000021;
+	drop table cbm_fbs_10000021;
+	rename table temp to cbm_fbs_10000021;
+
+	// Расчитывает значение перцентиля 0,75
+	left join(cbm_fbs_10000021) load
+		Fractile(cbm_fbs.MetricValue, 0.75) as cbm_fbs.Percentile75
+	resident cbm_fbs_10000021
+	where (cbm_fbs.MetricValue >= cbm_fbs.MetricPlanValue);
+
+	// Добавляет поля DeviationMarker и LoadID
+	temp:
+	noconcatenate load *,
+		If((cbm_fbs.MetricValue < cbm_fbs.MetricPlanValue), 
+			1, 
+			If((cbm_fbs.MetricValue >= cbm_fbs.Percentile75),
+				13,
+				0
+			)
+		) as cbm_fbs.DeviationMarker,
+		cbm_fbs.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID
+	resident cbm_fbs_10000021;
+	drop table cbm_fbs_10000021;
+	rename table temp to cbm_fbs_10000021;
+
+	// Сливает данные метрики 10000021 с основной таблицей
 	concatenate(cbm_data) load
 		org_code,
 		cbm_fbs.TBCode as cbm.TBCode,
@@ -880,9 +891,62 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm_fbs.MetricValue as cbm.MetricValue,
 		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
 		cbm_fbs.LoadID as cbm.LoadID
-	resident cbm_fbs;
-	drop table cbm_fbs; 
+	resident cbm_fbs_10000021;
+	drop table cbm_fbs_10000021; 
 
+	// Выделяет таблицу метрики 10000022
+	cbm_fbs_10000022:
+	noconcatenate load * resident cbm_fbs;
+
+	// Получает значение метрики 10000022
+	temp:
+	noconcatenate load *,
+		If((cbm_fbs.MetricValue > cbm_fbs.MetricPlanValue), 1, 0) as cbm_fbs.DeviationMarker,
+		cbm_fbs.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID;
+	noconcatenate load *,
+		10000022 as cbm_fbs.MetricID,
+		'Степень неравномерности плана продаж продуктов полки' as cbm_fbs.MetricName,
+		2 as cbm_fbs.MetricDirection,
+		0.6 as cbm_fbs.MetricPlanValue,
+		Null() as cbm_fbs.ElementType, 
+		Null() as cbm_fbs.ElementID,
+		'EXT_FILE' as cbm_fbs.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
+		'STUFF' as cbm_fbs.StructLevel,
+		Null() as cbm_fbs.DevElementName,
+		If((cbm_fbs.PlanThisYear > 0), 
+			cbm_fbs.Plan4QThisYear / cbm_fbs.PlanThisYear,
+			// Если нет годового плана
+			0
+		) as cbm_fbs.MetricValue
+	resident cbm_fbs_10000022;
+	drop table cbm_fbs_10000022;
+	rename table temp to cbm_fbs_10000022;
+
+	// Сливает данные метрики 10000021 с основной таблицей
+	concatenate(cbm_data) load
+		org_code,
+		cbm_fbs.TBCode as cbm.TBCode,
+		cbm_fbs.GOSBCode as cbm.GOSBCode,
+		cbm_fbs.TBName as cbm.TBName,
+		cbm_fbs.GOSBName as cbm.GOSBName,
+		cbm_fbs.MetricID as cbm.MetricID,
+		cbm_fbs.MetricName as cbm.MetricName,
+		cbm_fbs.MetricDirection as cbm.MetricDirection,
+		cbm_fbs.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_fbs.ElementType as cbm.ElementType, 
+		cbm_fbs.ElementID as cbm.ElementID,
+		cbm_fbs.Segment as cbm.Segment,
+		cbm_fbs.ReportDate as cbm.ReportDate,
+		cbm_fbs.StructLevel as cbm.StructLevel,
+		cbm_fbs.DevElementName as cbm.DevElementName,
+		cbm_fbs.MetricValue as cbm.MetricValue,
+		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
+		cbm_fbs.LoadID as cbm.LoadID
+	resident cbm_fbs_10000022;
+	drop table cbm_fbs_10000022; 
+
+	// drop table cbm_fbs;
 	////////////////////////////////////////////////////////////////////////////////
 
 	// Меняет названия столбцов на нужные
