@@ -593,6 +593,12 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		235
 	];
 
+	// Считает число продуктов
+	product_lookup_count:
+	noconcatenate load Count(product_id) as product_count resident product_lookup;
+	join(product_lookup) load product_count resident product_lookup_count;
+	drop table product_lookup_count;
+
 	///////////////////////////////////////////////////////////////////////////
 	// Получает продукты
 	if '$(cbmConnection)' = '1' then
@@ -618,7 +624,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// "group",
 			// attachment,
 			// "type",
-			// consist		
+			// consist
 		from [$(fbs_prd_qvd)] (qvd)
 		//Только тираж
 		where (status = 'Тираж');
@@ -672,17 +678,21 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 
 	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года (весь прошлый год, если первый квартал)
 	//$1 - год, $2 - квартал
-	set cbmIsPrevQuarters = 
+	set cbmIsPrevQuarterThisYear = 
 		If($(ggffQuarterNo(Today())) = 1,
 			($1 = Year(Today()) - 1),
 			(($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today()))))
 		);
+	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю: $1 - год, $2 - квартал
+	set cbmIsPrevQuarterEver = (($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today())))));
 	// Проверяет год записи, текущий ли это год: 1 - год
 	set cbmIsThisYear = ($1 = Year(Today()));
 	// Проверяет квартал записи, четвертый ли он текущего года: $1 - год, $2 - квартал
 	set sbmIs4QThisYear = (($1 = Year(Today())) and ($2 = 4));
 	// Проверяет, не ГЧП ли продукт: $1 - продукт
 	set cbmIsNotGChP = (Left($1, 3) <> 'ГЧП');
+	// Проверяет реализацию
+	set cbmIsRealised = (($1 = 134) or ($1 = 777));
 
 	//Получает данные
 	if '$(cbmConnection)' = '1' then
@@ -705,16 +715,15 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// chain,
 			// object,
 			// id_basket_item,
-			If($(cbmIsPrevQuarters("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
+			If($(cbmIsPrevQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
 			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
-			If($(cbmIsPrevQuarters("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact
-			// "fact" as cbm_fbs.Fact,
+			If($(cbmIsPrevQuarterThisYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact,
+			If($(cbmIsPrevQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact
 			// "year",
 			// quarter,
 			// $(ggffGetDateFromQY(quarter, "year")) as cbm_fbs.Date,
 			// status as cbm_fbs.Status,
-			// income as cbm_fbs.IncomeFact,
 			// income_plan as cbm_fbs.IncomePlan,
 			// template_id as cbm_fbs.TemplateID,
   		// template_title as cbm_fbs.TemplateTitle,
@@ -750,16 +759,15 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// chain,
 			// object,
 			// id_basket_item,
-			If($(cbmIsPrevQuarters("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
+			If($(cbmIsPrevQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
 			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
-			If($(cbmIsPrevQuarters("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact
-			// "fact" as cbm_fbs.Fact,
+			If($(cbmIsPrevQuarterThisYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact
+			If($(cbmIsPrevQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact
 			// "year",
 			// quarter,
 			// $(ggffGetDateFromQY(quarter, "year")) as cbm_fbs.Date,
 			// status as cbm_fbs.Status,
-			// income as cbm_fbs.IncomeFact,
 			// income_plan as cbm_fbs.IncomePlan,
 			// If("comment" = '-', '', "comment") as cbm_fbs.Comments,
 			// Date(create_date) as cbm_fbs.CreateDate,
@@ -789,7 +797,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	//Добавляет в основную таблицу ID продукта из справочника
 	left join(cbm_fbs) load
 		product as cbm_fbs.Product,
-		product_id as cbm_fbs.ProductID
+		product_id as cbm_fbs.ProductID,
+		product_count as cbm_fbs.ProductCount
 	resident product_lookup;
 	drop table product_lookup;
 
@@ -806,7 +815,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		Sum(cbm_fbs.PlanProgPrevQuarters) as cbm_fbs.PlanProgPrevQuarters,
 		Sum(cbm_fbs.Plan4QThisYear) as cbm_fbs.Plan4QThisYear,
 		Sum(cbm_fbs.PlanThisYear) as cbm_fbs.PlanThisYear,
-		Sum(cbm_fbs.IncomeFact) as cbm_fbs.IncomeFact
+		Sum(cbm_fbs.IncomeFact) as cbm_fbs.IncomeFact,
+		Count(distinct If(cbm_fbs.Fact > 0, cbm_fbs.Product)) / Only(cbm_fbs.ProductCount) as cbm_fbs.Penetration,
+		Count(distinct If(cbm_fbs.Fact > 0, cbm_fbs.Product)) as cbm_fbs.SoldProductCount,
+		Only(cbm_fbs.ProductCount) as cbm_fbs.ProductCount
 	resident cbm_fbs
 	where not(IsNull(cbm_fbs.ProductID)) and (org_code <> 3838) and (org_code <> 529052)
 	group by org_code, cbm_fbs.TBCode, cbm_fbs.GOSBCode, cbm_fbs.TBName, cbm_fbs.GOSBName, cbm_fbs.Cluster;
@@ -1015,9 +1027,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm_fbs.LoadID as cbm.LoadID
 	resident cbm_fbs_10000023;
 	drop table cbm_fbs_10000023; 
-
-	drop table cbm_fbs;
 	
+	////////////////////////////////////////////////////////////////////////////////
+
+	// Выделяет таблицу метрики 10000024
+	cbm_fbs_10000024:
+	noconcatenate load * resident cbm_fbs;
+	drop table cbm_fbs;
+
 	////////////////////////////////////////////////////////////////////////////////
 
 	// Меняет названия столбцов на нужные
