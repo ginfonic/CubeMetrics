@@ -10,6 +10,31 @@ sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
   $(mExitSubOnStepError);
 end sub;
 
+// Сливает метрику с основной таблицей
+sub cbmMergeMetric(metric_code)
+	concatenate(cbm_data) load
+		org_code,
+		cbm_fbs.TBCode as cbm.TBCode,
+		cbm_fbs.GOSBCode as cbm.GOSBCode,
+		cbm_fbs.TBName as cbm.TBName,
+		cbm_fbs.GOSBName as cbm.GOSBName,
+		cbm_fbs.MetricID as cbm.MetricID,
+		cbm_fbs.MetricName as cbm.MetricName,
+		cbm_fbs.MetricDirection as cbm.MetricDirection,
+		cbm_fbs.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_fbs.ElementType as cbm.ElementType, 
+		cbm_fbs.ElementID as cbm.ElementID,
+		cbm_fbs.Segment as cbm.Segment,
+		cbm_fbs.ReportDate as cbm.ReportDate,
+		cbm_fbs.StructLevel as cbm.StructLevel,
+		cbm_fbs.DevElementName as cbm.DevElementName,
+		cbm_fbs.MetricValue as cbm.MetricValue,
+		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
+		cbm_fbs.LoadID as cbm.LoadID
+	resident cbm_fbs_$(metric_code);
+	drop table cbm_fbs_$(metric_code); 
+end sub;
+
 //Создает модель данных
 sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, org_qvd, org_xl)
 	// Выражения расчета необходимых дат
@@ -686,7 +711,17 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относительно текущего: $1 - год, $2 - квартал
 	set cbmIsLastQuarterEver = (($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today())))));
 	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относитеотно предыдущего: $1 - год, $2 - квартал
-	set cbmIsPrevLastQuarterEver = (($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today())))));
+	set cbmIsPrevLastQuarterEver = 
+		If(($(ggffQuarterNo(Today())) > 2),
+			// Сейчас 3 или 4 квартал: прошлые годы или этот, но запись старше предыдущего квартала
+			(($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < ($(ggffQuarterNo(Today())) - 1)))),
+			If($(ggffQuarterNo(Today())) = 2,
+				// Сейчас 2 квартал: прошлые годы 
+				($1 < Year(Today())),
+				// Сейчас 1 квартал: позапрошлные годы или прошлый, но запись старше 4 квартала
+				(($1 < (Year(Today()) - 1)) or (($1 = (Year(Today()) - 1)) and ($2 < 4)))
+			)
+		);
 	// Проверяет год записи, текущий ли это год: 1 - год
 	set cbmIsThisYear = ($1 = Year(Today()));
 	// Проверяет квартал записи, четвертый ли он текущего года: $1 - год, $2 - квартал
@@ -721,7 +756,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
 			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
 			If($(cbmIsLastQuarterThisYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact,
-			If($(cbmIsLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact
+			If($(cbmIsLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact,
+			If($(cbmIsPrevLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.PrevFact
 			// "year",
 			// quarter,
 			// $(ggffGetDateFromQY(quarter, "year")) as cbm_fbs.Date,
@@ -765,7 +801,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
 			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
 			If($(cbmIsLastQuarterThisYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact
-			If($(cbmIsLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact
+			If($(cbmIsLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact,
+			If($(cbmIsPrevLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.PrevFact
 			// "year",
 			// quarter,
 			// $(ggffGetDateFromQY(quarter, "year")) as cbm_fbs.Date,
@@ -807,6 +844,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	//Сливает записи по оргкоду
 	//Убирает из таблицы записи с продуктами не из справочника
 	temp:
+	noconcatenate load *,
+		cbm_fbs.Penetration - cbm_fbs.PrevPenetration as cbm_fbs.PenetrationGrowth;
 	noconcatenate load 
 		org_code,
 		cbm_fbs.TBCode,
@@ -819,8 +858,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		Sum(cbm_fbs.PlanThisYear) as cbm_fbs.PlanThisYear,
 		Sum(cbm_fbs.IncomeFact) as cbm_fbs.IncomeFact,
 		Count(distinct If(cbm_fbs.Fact > 0, cbm_fbs.Product)) / Only(cbm_fbs.ProductCount) as cbm_fbs.Penetration,
-		Count(distinct If(cbm_fbs.Fact > 0, cbm_fbs.Product)) as cbm_fbs.SoldProductCount,
-		Only(cbm_fbs.ProductCount) as cbm_fbs.ProductCount
+		Count(distinct If(cbm_fbs.PrevFact > 0, cbm_fbs.Product)) / Only(cbm_fbs.ProductCount) as cbm_fbs.PrevPenetration
 	resident cbm_fbs
 	where not(IsNull(cbm_fbs.ProductID)) and (org_code <> 3838) and (org_code <> 529052)
 	group by org_code, cbm_fbs.TBCode, cbm_fbs.GOSBCode, cbm_fbs.TBName, cbm_fbs.GOSBName, cbm_fbs.Cluster;
@@ -891,27 +929,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	rename table temp to cbm_fbs_10000021;
 
 	// Сливает данные метрики 10000021 с основной таблицей
-	concatenate(cbm_data) load
-		org_code,
-		cbm_fbs.TBCode as cbm.TBCode,
-		cbm_fbs.GOSBCode as cbm.GOSBCode,
-		cbm_fbs.TBName as cbm.TBName,
-		cbm_fbs.GOSBName as cbm.GOSBName,
-		cbm_fbs.MetricID as cbm.MetricID,
-		cbm_fbs.MetricName as cbm.MetricName,
-		cbm_fbs.MetricDirection as cbm.MetricDirection,
-		cbm_fbs.MetricPlanValue as cbm.MetricPlanValue,
-		cbm_fbs.ElementType as cbm.ElementType, 
-		cbm_fbs.ElementID as cbm.ElementID,
-		cbm_fbs.Segment as cbm.Segment,
-		cbm_fbs.ReportDate as cbm.ReportDate,
-		cbm_fbs.StructLevel as cbm.StructLevel,
-		cbm_fbs.DevElementName as cbm.DevElementName,
-		cbm_fbs.MetricValue as cbm.MetricValue,
-		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
-		cbm_fbs.LoadID as cbm.LoadID
-	resident cbm_fbs_10000021;
-	drop table cbm_fbs_10000021; 
+	call cbmMergeMetric(10000021);
 
 	////////////////////////////////////////////////////////////////////////////////
 
@@ -944,28 +962,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	drop table cbm_fbs_10000022;
 	rename table temp to cbm_fbs_10000022;
 
-	// Сливает данные метрики 10000021 с основной таблицей
-	concatenate(cbm_data) load
-		org_code,
-		cbm_fbs.TBCode as cbm.TBCode,
-		cbm_fbs.GOSBCode as cbm.GOSBCode,
-		cbm_fbs.TBName as cbm.TBName,
-		cbm_fbs.GOSBName as cbm.GOSBName,
-		cbm_fbs.MetricID as cbm.MetricID,
-		cbm_fbs.MetricName as cbm.MetricName,
-		cbm_fbs.MetricDirection as cbm.MetricDirection,
-		cbm_fbs.MetricPlanValue as cbm.MetricPlanValue,
-		cbm_fbs.ElementType as cbm.ElementType, 
-		cbm_fbs.ElementID as cbm.ElementID,
-		cbm_fbs.Segment as cbm.Segment,
-		cbm_fbs.ReportDate as cbm.ReportDate,
-		cbm_fbs.StructLevel as cbm.StructLevel,
-		cbm_fbs.DevElementName as cbm.DevElementName,
-		cbm_fbs.MetricValue as cbm.MetricValue,
-		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
-		cbm_fbs.LoadID as cbm.LoadID
-	resident cbm_fbs_10000022;
-	drop table cbm_fbs_10000022; 
+	// Сливает данные метрики 10000022 с основной таблицей
+	call cbmMergeMetric(10000022);
 
 	////////////////////////////////////////////////////////////////////////////////
 
@@ -1007,35 +1005,96 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	drop table cbm_fbs_10000023;
 	rename table temp to cbm_fbs_10000023;
 
-	// Сливает данные метрики 10000021 с основной таблицей
-	concatenate(cbm_data) load
-		org_code,
-		cbm_fbs.TBCode as cbm.TBCode,
-		cbm_fbs.GOSBCode as cbm.GOSBCode,
-		cbm_fbs.TBName as cbm.TBName,
-		cbm_fbs.GOSBName as cbm.GOSBName,
-		cbm_fbs.MetricID as cbm.MetricID,
-		cbm_fbs.MetricName as cbm.MetricName,
-		cbm_fbs.MetricDirection as cbm.MetricDirection,
-		cbm_fbs.MetricPlanValue as cbm.MetricPlanValue,
-		cbm_fbs.ElementType as cbm.ElementType, 
-		cbm_fbs.ElementID as cbm.ElementID,
-		cbm_fbs.Segment as cbm.Segment,
-		cbm_fbs.ReportDate as cbm.ReportDate,
-		cbm_fbs.StructLevel as cbm.StructLevel,
-		cbm_fbs.DevElementName as cbm.DevElementName,
-		cbm_fbs.MetricValue as cbm.MetricValue,
-		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
-		cbm_fbs.LoadID as cbm.LoadID
-	resident cbm_fbs_10000023;
-	drop table cbm_fbs_10000023; 
+	// Сливает данные метрики 10000023 с основной таблицей
+	call cbmMergeMetric(10000023);
 	
 	////////////////////////////////////////////////////////////////////////////////
 
 	// Выделяет таблицу метрики 10000024
 	cbm_fbs_10000024:
 	noconcatenate load * resident cbm_fbs;
-	drop table cbm_fbs;
+
+	// Расчитывает значение перцентилей 0,75 и 0,25
+	left join(cbm_fbs_10000024) load 
+		cbm_fbs.Cluster,
+		Fractile(cbm_fbs.Penetration, 0.75) as cbm_fbs.Percentile75,
+		Fractile(cbm_fbs.Penetration, 0.25) as cbm_fbs.Percentile25
+	resident cbm_fbs_10000024
+	group by cbm_fbs.Cluster;
+
+	// Получает значение метрики 10000024
+	temp:
+	noconcatenate load *,
+		10000024 as cbm_fbs.MetricID,
+		'Низкая доля продаж продуктов полки управляющего' as cbm_fbs.MetricName,
+		1 as cbm_fbs.MetricDirection,
+		0 as cbm_fbs.MetricPlanValue,
+		Null() as cbm_fbs.ElementType, 
+		Null() as cbm_fbs.ElementID,
+		'EXT_FILE' as cbm_fbs.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
+		'STUFF' as cbm_fbs.StructLevel,
+		'Боттом 25% - '&cbm_fbs.Percentile25&', топ 25% - '&cbm_fbs.Percentile75 as cbm_fbs.DevElementName,
+		cbm_fbs.Penetration as cbm_fbs.MetricValue,
+		'10000024_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
+		If((cbm_fbs.Penetration >= cbm_fbs.Percentile75), 
+			13, 
+			If((cbm_fbs.Penetration <= cbm_fbs.Percentile25),
+				1,
+				0
+			)
+		) as cbm_fbs.DeviationMarker
+	resident cbm_fbs_10000024;
+	drop table cbm_fbs_10000024;
+	rename table temp to cbm_fbs_10000024;
+
+	// Сливает данные метрики 10000024 с основной таблицей
+	call cbmMergeMetric(10000024);
+
+	////////////////////////////////////////////////////////////////////////////////
+
+	// Выделяет таблицу метрики 10000025
+	cbm_fbs_10000025:
+	noconcatenate load * resident cbm_fbs;
+
+	// Расчитывает значение перцентилей 0,5
+	left join(cbm_fbs_10000025) load 
+		cbm_fbs.Cluster,
+		Fractile(cbm_fbs.Penetration, 0.5) as cbm_fbs.PenetrationPercentile50,
+		Fractile(cbm_fbs.PenetrationGrowth, 0.5) as cbm_fbs.PenetrationGrowthPercentile50
+	resident cbm_fbs_10000025
+	group by cbm_fbs.Cluster;
+
+	// Получает значение метрики 10000025
+	temp:
+	noconcatenate load *,
+		10000025 as cbm_fbs.MetricID,
+		'Низкий прирост доли продаж продуктов полки управляющего' as cbm_fbs.MetricName,
+		1 as cbm_fbs.MetricDirection,
+		0 as cbm_fbs.MetricPlanValue,
+		Null() as cbm_fbs.ElementType, 
+		Null() as cbm_fbs.ElementID,
+		'EXT_FILE' as cbm_fbs.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
+		'STUFF' as cbm_fbs.StructLevel,
+		'Медиана фактической доли продаж - '&cbm_fbs.PenetrationPercentile50&
+			', медиана темпа прироста фактической доли продаж - '&cbm_fbs.PenetrationGrowthPercentile50 
+		as cbm_fbs.DevElementName,
+		cbm_fbs.PenetrationGrowth as cbm_fbs.MetricValue,
+		'10000025_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
+		If((cbm_fbs.Penetration >= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth >= cbm_fbs.PenetrationGrowthPercentile50), 
+			13, 
+			If((cbm_fbs.Penetration <= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50),
+				1,
+				0
+			)
+		) as cbm_fbs.DeviationMarker
+	resident cbm_fbs_10000025;
+	drop table cbm_fbs_10000025;
+	rename table temp to cbm_fbs_10000025;
+
+	// Сливает данные метрики 10000025 с основной таблицей
+	call cbmMergeMetric(10000025);
 
 	////////////////////////////////////////////////////////////////////////////////
 
