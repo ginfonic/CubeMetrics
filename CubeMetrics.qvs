@@ -530,48 +530,56 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		If(not $(ggffIsEmpty(cbm.MetricValue)),
 			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
 				// 10000015
-				If(cbm.MetricValue < cbm.MetricPlanValue, 
+				If((cbm.MetricValue < cbm.MetricPlanValue), 
 					1, 
-					If(cbm.MetricValue >= cbm.Percentile75,
+					If((cbm.MetricValue > cbm.Percentile75),
 						13,
 						0
 					)
 				),
 				// 10000016
-				If(cbm.MetricValue > cbm.MetricPlanValue, 1, 0), 
+				If((cbm.MetricValue > cbm.MetricPlanValue), 1, 0), 
 				// 10000017
 				If(cbm.MetricValue = cbm.MetricPlanValue, 
 					13, 
-					If(cbm.MetricValue >= cbm.Percentile75,
+					If((cbm.MetricValue > cbm.Percentile75),
 						1,
 						0
 					)
 				),
 				// 10000018
-				If(cbm.MetricValue < cbm.MetricPlanValue, 
+				If((cbm.MetricValue < cbm.MetricPlanValue), 
 					1, 
-					If(cbm.MetricValue >= cbm.Percentile75,
+					If((cbm.MetricValue > cbm.Percentile75),
 						13,
 						0
 					)
 				),
 				// 10000019
-				If(cbm.MetricValue < cbm.MetricPlanValue, 
+				If((cbm.MetricValue < cbm.MetricPlanValue), 
 					1, 
-					If(cbm.MetricValue >= cbm.Percentile75,
+					If((cbm.MetricValue > cbm.Percentile75),
 						13,
 						0
 					)
 				),
 				// 10000020
-				If(cbm.MetricValue >= cbm.Percentile75, 
-					13, 
-					If(cbm.MetricValue <= cbm.Percentile25,
+				If((cbm.MetricValue <= cbm.Percentile75) and (cbm.MetricValue >= cbm.Percentile25), 
+					0, 
+					If((cbm.MetricValue < cbm.Percentile25),
 						1,
-						0
+						13
 					)
-				))
-			) as cbm.DeviationMarker
+				)
+				// If((cbm.MetricValue >= cbm.Percentile75), 
+				// 	13, 
+				// 	If((cbm.MetricValue <= cbm.Percentile25),
+				// 		1,
+				// 		0
+				// 	)
+				// )
+			)
+		) as cbm.DeviationMarker
 	resident cbm_data;
 	drop table cbm_data;
 	rename table temp to cbm_data;
@@ -994,11 +1002,11 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'Боттом 25% - '&cbm_fbs.Percentile25&', топ 25% - '&cbm_fbs.Percentile75 as cbm_fbs.DevElementName,
 		cbm_fbs.IncomeFact as cbm_fbs.MetricValue,
 		'10000023_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
-		If((cbm_fbs.IncomeFact >= cbm_fbs.Percentile75), 
-			13, 
-			If((cbm_fbs.IncomeFact <= cbm_fbs.Percentile25),
+		If((cbm_fbs.IncomeFact <= cbm_fbs.Percentile75) and (cbm_fbs.IncomeFact >= cbm_fbs.Percentile25), 
+			0, 
+			If((cbm_fbs.IncomeFact < cbm_fbs.Percentile25),
 				1,
-				0
+				13
 			)
 		) as cbm_fbs.DeviationMarker
 	resident cbm_fbs_10000023;
@@ -1037,11 +1045,11 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'Боттом 25% - '&cbm_fbs.Percentile25&', топ 25% - '&cbm_fbs.Percentile75 as cbm_fbs.DevElementName,
 		cbm_fbs.Penetration as cbm_fbs.MetricValue,
 		'10000024_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
-		If((cbm_fbs.Penetration >= cbm_fbs.Percentile75), 
-			13, 
-			If((cbm_fbs.Penetration <= cbm_fbs.Percentile25),
+		If((cbm_fbs.Penetration <= cbm_fbs.Percentile75) and (cbm_fbs.Penetration >= cbm_fbs.Percentile25), 
+			0, 
+			If((cbm_fbs.Penetration < cbm_fbs.Percentile25),
 				1,
-				0
+				13
 			)
 		) as cbm_fbs.DeviationMarker
 	resident cbm_fbs_10000024;
@@ -1082,13 +1090,21 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		as cbm_fbs.DevElementName,
 		cbm_fbs.PenetrationGrowth as cbm_fbs.MetricValue,
 		'10000025_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
-		If((cbm_fbs.Penetration >= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth >= cbm_fbs.PenetrationGrowthPercentile50), 
-			13, 
-			If((cbm_fbs.Penetration <= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50),
+		If(((cbm_fbs.Penetration >= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50)) or
+				((cbm_fbs.Penetration <= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth >= cbm_fbs.PenetrationGrowthPercentile50)), 
+			0, 
+			If((cbm_fbs.Penetration < cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth < cbm_fbs.PenetrationGrowthPercentile50),
 				1,
-				0
+				13
 			)
 		) as cbm_fbs.DeviationMarker
+		// If((cbm_fbs.Penetration >= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth >= cbm_fbs.PenetrationGrowthPercentile50), 
+		// 	13, 
+		// 	If((cbm_fbs.Penetration <= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50),
+		// 		1,
+		// 		0
+		// 	)
+		// ) as cbm_fbs.DeviationMarker
 	resident cbm_fbs_10000025;
 	drop table cbm_fbs_10000025;
 	rename table temp to cbm_fbs_10000025;
