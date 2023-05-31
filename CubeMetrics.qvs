@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -36,7 +36,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, org_qvd, org_xl)
+sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, org_qvd, org_xl)
 	// Выражения расчета необходимых дат
 	set cbmGetPrevMStart = MonthStart(AddMonths(Today(), -1));
 	set cbmGetPrevMEnd = MonthEnd(AddMonths(Today(), -1));
@@ -624,7 +624,6 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	join(product_lookup) load product_count resident product_lookup_count;
 	drop table product_lookup_count;
 
-	///////////////////////////////////////////////////////////////////////////
 	// Получает продукты
 	if '$(cbmConnection)' = '1' then
 		//QVD
@@ -688,7 +687,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
-	//Добавляет поля из загруженного справочника в справочник продуктов
+	// Добавляет поля из загруженного справочника в справочник продуктов
 	left join(product_lookup) load
 		product_id,
 		product
@@ -701,14 +700,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		not(IsNull($2)) and ($2 <> '') and ($2 <> '-') and 
 		not(IsNull($3)) and ($3 <> '') and ($3 <> '-');
 
-	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года относительно текущего 
+	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года относительно текущего квартала
 	//(весь прошлый год, если первый квартал): $1 - год, $2 - квартал
 	set cbmIsLastQuarterThisYear = 
 		If($(ggffQuarterNo(Today())) = 1,
 			($1 = Year(Today()) - 1),
 			(($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today()))))
 		);
-	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относительно текущего: $1 - год, $2 - квартал
+	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относительно текущего квартала: $1 - год, $2 - квартал
 	set cbmIsLastQuarterEver = (($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today())))));
 	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относитеотно предыдущего: $1 - год, $2 - квартал
 	set cbmIsPrevLastQuarterEver = 
@@ -831,7 +830,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		org_gosb_name as cbm_fbs.GOSBName,
 		If(IsNull(org_cluster), 'Без группы', org_cluster) as cbm_fbs.Cluster
  	resident org;
-	drop table org;
+	// drop table org;
 
 	//Добавляет в основную таблицу ID и количество продуктов из справочника
 	left join(cbm_fbs) load
@@ -1095,6 +1094,122 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 
 	// Сливает данные метрики 10000025 с основной таблицей
 	call cbmMergeMetric(10000025);
+	drop table cbm_fbs;
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Данные о посещаемости
+
+	// Получает данные о посещаемости
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_trf:
+		noconcatenate load
+			// Date(Floor(dates)) as cbm_trf.Date,
+			// title as cbm_trf.Role,
+			duration as cbm_trf.Duration,
+			$(ggffCreateOrgCode(tb_code, gosb_code)) as org_code
+		from [$(trf_qvd)] (qvd)
+		where (title = 'Управляющий ГОСБ') and 
+			(Date(Floor(dates)) >= Date(Floor($(cbmGetPrevMStart)))) and 
+			(Date(Floor(dates)) <= Date(Floor($(cbmGetPrevMEnd))));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		cbm_trf:
+		noconcatenate load
+			// Date(Floor(dates)) as cbm_trf.Date,
+			// title as cbm_trf.Role,
+			duration as cbm_trf.Duration,
+			$(ggffCreateOrgCode(tb_code, gosb_code)) as org_code
+		from [$(trf_xl)] (ooxml, embedded labels, table is Sheet1)
+		where (title = 'Управляющий ГОСБ') and 
+			(Date(Floor(dates)) >= Date(Floor($(cbmGetPrevMStart)))) and 
+			(Date(Floor(dates)) <= Date(Floor($(cbmGetPrevMEnd))));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	// Добавляет к таблице данные из таблицы оргкодов
+	right join(cbm_trf) load
+		org_code,
+		org_tb_code as cbm_trf.TBCode,
+		org_gosb_code as cbm_trf.GOSBCode,
+		org_tb_name as cbm_trf.TBName,
+		org_gosb_name as cbm_trf.GOSBName
+	resident org 
+	where Len(org_code) > 2;
+	drop table org;
+
+	// Сливает данные по оргкоду
+	temp:
+	noconcatenate load
+		org_code,
+		cbm_trf.TBCode,
+		cbm_trf.GOSBCode,
+		cbm_trf.TBName,
+		cbm_trf.GOSBName,
+		Sum(cbm_trf.Duration) as cbm_trf.Duration
+	resident cbm_trf
+	group by org_code, cbm_trf.TBCode, cbm_trf.GOSBCode, cbm_trf.TBName, cbm_trf.GOSBName;
+	drop table cbm_trf;
+	rename table temp to cbm_trf;
+
+	// Расчитывает значение перцентиля 0,75
+	left join(cbm_trf) load 
+		Fractile(cbm_trf.Duration, 0.75) as cbm_trf.Percentile75
+	resident cbm_trf;
+
+	// Получает значение метрики
+	temp:
+	noconcatenate load *,
+		10000035 as cbm_trf.MetricID,
+		'Посещаемость платформы ПРБР' as cbm_trf.MetricName,
+		1 as cbm_trf.MetricDirection,
+		0 as cbm_trf.MetricPlanValue,
+		Null() as cbm_trf.ElementType, 
+		Null() as cbm_trf.ElementID,
+		'EXT_FILE' as cbm_trf.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_trf.ReportDate,
+		'STUFF' as cbm_trf.StructLevel,
+		'https://sudirvpo.sigma.sbrf.ru/vpo-sp-qs/extensions/Infopanel/Infopanel.html' as cbm_trf.DevElementName,
+		Interval(cbm_trf.Duration/(3600*24),'h:mm:ss') as cbm_trf.MetricValue,
+		'10000035_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_trf.LoadID,
+		If((cbm_trf.Duration > cbm_trf.Percentile75), 
+			13, 
+			If((cbm_trf.Duration <= 0),
+				1,
+				0
+			)
+		) as cbm_trf.DeviationMarker
+	resident cbm_trf;
+	drop table cbm_trf;
+	rename table temp to cbm_trf;
+
+	// Сливает данные метрики с основной таблицей
+	concatenate(cbm_data) load
+		org_code,
+		cbm_trf.TBCode as cbm.TBCode,
+		cbm_trf.GOSBCode as cbm.GOSBCode,
+		cbm_trf.TBName as cbm.TBName,
+		cbm_trf.GOSBName as cbm.GOSBName,
+		cbm_trf.MetricID as cbm.MetricID,
+		cbm_trf.MetricName as cbm.MetricName,
+		cbm_trf.MetricDirection as cbm.MetricDirection,
+		cbm_trf.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_trf.ElementType as cbm.ElementType, 
+		cbm_trf.ElementID as cbm.ElementID,
+		cbm_trf.Segment as cbm.Segment,
+		cbm_trf.ReportDate as cbm.ReportDate,
+		cbm_trf.StructLevel as cbm.StructLevel,
+		cbm_trf.DevElementName as cbm.DevElementName,
+		cbm_trf.MetricValue as cbm.MetricValue,
+		cbm_trf.DeviationMarker as cbm.DeviationMarker,
+		cbm_trf.LoadID as cbm.LoadID
+	resident cbm_trf;
+	drop table cbm_trf;
 
 	////////////////////////////////////////////////////////////////////////////////
 
