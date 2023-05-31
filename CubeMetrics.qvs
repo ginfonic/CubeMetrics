@@ -586,7 +586,6 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		org_tb_name as cbm.TBName,
 		org_gosb_name as cbm.GOSBName
 	resident org;
-	// drop table org;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Данные с платформы
@@ -834,7 +833,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
  	resident org;
 	drop table org;
 
-	//Добавляет в основную таблицу ID продукта из справочника
+	//Добавляет в основную таблицу ID и количество продуктов из справочника
 	left join(cbm_fbs) load
 		product as cbm_fbs.Product,
 		product_id as cbm_fbs.ProductID,
