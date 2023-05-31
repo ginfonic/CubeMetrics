@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -36,7 +36,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, org_qvd, org_xl)
+sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, org_qvd, org_xl)
 	// Выражения расчета необходимых дат
 	set cbmGetPrevMStart = MonthStart(AddMonths(Today(), -1));
 	set cbmGetPrevMEnd = MonthEnd(AddMonths(Today(), -1));
@@ -1162,6 +1162,42 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		Fractile(cbm_trf.Duration, 0.75) as cbm_trf.Percentile75
 	resident cbm_trf;
 
+	//Получает таблицу управляющих из данных HR
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_trf_hr:
+		noconcatenate load
+			org_code,
+			// Определяет, активен ли Управляющий ГОСБ
+			("Таб. номер" <> -1) as cbm_trf_hr.IsActive
+		from [$(trf_hr_qvd)] (qvd)
+		//Загружает только Управляющих, не Председателей
+		where not(IsNull(org_code)) and (org_code <> '') and (Len(org_code) > 2);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		cbm_trf_hr:
+		noconcatenate load
+			org_code,
+			// Определяет, активен ли управляющий ГОСБ
+			("Таб. номер" <> -1) as cbm_trf_hr.IsActive
+		from [$(trf_hr_xl)] (ooxml, embedded labels, table is Sheet1)
+		//Загружает только Управляющих, не Председателей
+		where (org_code <> '') and (org_code <> '-') and (Len(org_code) > 2);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	// Добавляет в таблицу посещаемости данные об активности управляющих
+	left join(cbm_trf) load
+		org_code,
+		cbm_trf_hr.IsActive as cbm_trf.IsActive
+	resident cbm_trf_hr;
+	drop table cbm_trf_hr;
+
 	// Получает значение метрики
 	temp:
 	noconcatenate load *,
@@ -1174,14 +1210,17 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_trf.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_trf.ReportDate,
 		'STUFF' as cbm_trf.StructLevel,
-		'https://sudirvpo.sigma.sbrf.ru/vpo-sp-qs/extensions/Infopanel/Infopanel.html' as cbm_trf.DevElementName,
-		Interval(cbm_trf.Duration/(3600*24),'h:mm:ss') as cbm_trf.MetricValue,
+		'https://sudirvpo.sigma.sbrf.ru/vpo-sp-qs/extensions/Infopanel/Infopanel.html?page=td&td_page=gf_other/traffic_monitor' as cbm_trf.DevElementName,
+		If(cbm_trf.IsActive, Interval(cbm_trf.Duration/(3600*24),'h:mm:ss')) as cbm_trf.MetricValue,
+		// Interval(cbm_trf.Duration/(3600*24),'h:mm:ss') as cbm_trf.MetricValue,
 		'10000035_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_trf.LoadID,
-		If((cbm_trf.Duration > cbm_trf.Percentile75), 
-			13, 
-			If((cbm_trf.Duration <= 0),
-				1,
-				0
+		If(cbm_trf.IsActive, 
+			If((cbm_trf.Duration > cbm_trf.Percentile75), 
+				13, 
+				If((cbm_trf.Duration <= 0),
+					1,
+					0
+				)
 			)
 		) as cbm_trf.DeviationMarker
 	resident cbm_trf;
