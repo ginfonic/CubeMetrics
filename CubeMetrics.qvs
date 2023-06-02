@@ -566,7 +566,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				// 10000020
 				If((cbm.MetricValue > cbm.Percentile75), 
 					13, 
-					If((cbm.MetricValue <= cbm.Percentile25) and (cbm.Percentile25 <> cbm.Percentile75),
+					If((cbm.MetricValue <= cbm.Percentile25) and ((cbm.Percentile25 <> 0) or (cbm.Percentile75 <> 0)),
 						1,
 						0
 					)
@@ -902,7 +902,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		If((cbm_fbs.Milestone > 0), 
 			cbm_fbs.PlanProgPrevQuarters / cbm_fbs.Milestone,
 			// Если нет ориентира, то выше границы плана
-			1.11
+			'1,11'
 		) as cbm_fbs.MetricValue,
 		'10000021_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID
 	resident cbm_fbs_10000021;
@@ -999,7 +999,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'10000023_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
 		If((cbm_fbs.IncomeFact > cbm_fbs.Percentile75), 
 			13, 
-			If((cbm_fbs.IncomeFact <= cbm_fbs.Percentile25) and (cbm_fbs.Percentile25 <> cbm_fbs.Percentile75),
+			If((cbm_fbs.IncomeFact <= cbm_fbs.Percentile25) and ((cbm_fbs.Percentile25 <> 0) or (cbm_fbs.Percentile75 <> 0)),
 				1,
 				0
 			)
@@ -1037,9 +1037,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'Боттом 25% - '&Round(cbm_fbs.Percentile25*100, 1/10)&
-			'%, топ 25% - '&Round(cbm_fbs.Percentile75*100, 1/10)&'%' as cbm_fbs.DevElementName,
-		Round(cbm_fbs.Penetration, 1/1000) as cbm_fbs.MetricValue,
+		'Боттом 25% - '&Num(cbm_fbs.Percentile25, '#.0%', '.', '')&
+			', топ 25% - '&Num(cbm_fbs.Percentile75, '#.0%', '.', '') as cbm_fbs.DevElementName,
+		cbm_fbs.Penetration as cbm_fbs.MetricValue,
 		'10000024_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
 		If((cbm_fbs.Penetration > cbm_fbs.Percentile75), 
 			13, 
@@ -1081,8 +1081,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'Медиана фактической доли продаж - '&cbm_fbs.PenetrationPercentile50&
-			', медиана темпа прироста фактической доли продаж - '&cbm_fbs.PenetrationGrowthPercentile50 
+		'Медиана фактической доли продаж - '&Num(cbm_fbs.PenetrationPercentile50, '#.0%', '.', '')&
+			', медиана темпа прироста фактической доли продаж - '&Num(cbm_fbs.PenetrationGrowthPercentile50, '#.0%', '.', '') 
 		as cbm_fbs.DevElementName,
 		cbm_fbs.PenetrationGrowth as cbm_fbs.MetricValue,
 		'10000025_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
@@ -1217,7 +1217,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_trf.ReportDate,
 		'STUFF' as cbm_trf.StructLevel,
 		'https://sudirvpo.sigma.sbrf.ru/vpo-sp-qs/extensions/Infopanel/Infopanel.html?page=td&td_page=gf_other/traffic_monitor' as cbm_trf.DevElementName,
-		If(cbm_trf.IsActive, Interval(cbm_trf.Duration/(3600*24),'h:mm:ss')) as cbm_trf.MetricValue,
+		If(cbm_trf.IsActive, cbm_trf.Duration) as cbm_trf.MetricValue,
+		// If(cbm_trf.IsActive, Interval(cbm_trf.Duration/(3600*24),'h:mm:ss')) as cbm_trf.MetricValue,
 		// Interval(cbm_trf.Duration/(3600*24),'h:mm:ss') as cbm_trf.MetricValue,
 		'10000035_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD') as cbm_trf.LoadID,
 		If(cbm_trf.IsActive, 
