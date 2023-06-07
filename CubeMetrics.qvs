@@ -799,7 +799,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			If($(cbmIsLastQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanProgPrevQuarters,
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
 			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
-			If($(cbmIsLastQuarterThisYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact
+			If($(cbmIsLastQuarterThisYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact,
 			If($(cbmIsLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact,
 			If($(cbmIsPrevLastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.PrevFact
 			// "year",
