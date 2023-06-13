@@ -1215,9 +1215,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		Null() as cbm_trf.ElementID,
 		'EXT_FILE' as cbm_trf.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_trf.ReportDate,
-		'STUFF' as cbm_trf.StructLevel,
+		If(cbm_trf.IsActive, 'STUFF', 'NODATA') as cbm_trf.StructLevel,
 		'https://sudirvpo.sigma.sbrf.ru/vpo-sp-qs/extensions/Infopanel/Infopanel.html?page=td&td_page=gf_other/traffic_monitor&org_code='&org_code as cbm_trf.DevElementName,
-		If(cbm_trf.IsActive, cbm_trf.Duration) as cbm_trf.MetricValue,
+		If(cbm_trf.IsActive, cbm_trf.Duration, 0) as cbm_trf.MetricValue,
 		// If(cbm_trf.IsActive, Interval(cbm_trf.Duration/(3600*24),'h:mm:ss')) as cbm_trf.MetricValue,
 		// Interval(cbm_trf.Duration/(3600*24),'h:mm:ss') as cbm_trf.MetricValue,
 		'10000035_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD') as cbm_trf.LoadID,
@@ -1228,7 +1228,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 					1,
 					0
 				)
-			)
+			),
+			0
 		) as cbm_trf.DeviationMarker
 	resident cbm_trf;
 	drop table cbm_trf;
