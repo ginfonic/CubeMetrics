@@ -1229,6 +1229,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 					0
 				)
 			),
+			// Если нет управляющего
 			0
 		) as cbm_trf.DeviationMarker
 	resident cbm_trf;
