@@ -1261,6 +1261,34 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 
 	////////////////////////////////////////////////////////////////////////////////
 
+	// Финальный шаблон метрик
+	cbm_metrics_final_lookup:
+	noconcatenate load * inline [
+		cbm.MetricID, cbm.MetricShortName, cbm.Category
+		10000015, PL КРП на тек. год, Проекты
+		10000016, Идеи КРП > 60 дн., Проекты
+		10000017, Доля нереал. идей КРП, Проекты
+		10000018, Дост. КПР для вып. плана, Проекты
+		10000019, PL КРП на след. год, Проекты
+		10000020, Низкое кол-во идей КРП, Проекты
+		10000021, Дост. PL продаж, Полка
+		10000022, Неравн. плана продаж, Полка
+		10000023, Низкая доход. продаж, Полка
+		10000024, Низкая доля продаж, Полка
+		10000025, Низкий прир. доли продаж, Полка
+		10000035, Посещ. платф. ПРБР, Прочее
+  ];
+
+	// Добавляет финальный шаблон к таблице
+	left join(cbm_data) load
+		cbm.MetricID,
+		cbm.MetricShortName, 
+		cbm.Category
+	resident cbm_metrics_final_lookup;
+	drop table cbm_metrics_final_lookup;
+
+	////////////////////////////////////////////////////////////////////////////////
+
 	// Меняет названия столбцов на нужные
 	// cbm_out:
 	// noconcatenate load 
@@ -1487,6 +1515,8 @@ sub cbmSetVariables
 	//Переменные
 	let vOrgCode = 99;
 
+	// Дэшборд аггрегированных отклонений
+
 	//Измерения
 	//Сбербанк
 	set cbmGetSberbank = If('^(vOrgCode)' = '99', 'Сбербанк', org_tb_name_short);
@@ -1539,4 +1569,25 @@ sub cbmSetVariables
 	set cbmGetDeviationsNum = Sum(If((cbm.StructLevel = 'STUFF') and (cbm.DeviationMarker = 1), 1, 0));
 	set cbmGetDeviationsColor = If(Dimensionality() > 1, ^(ggffGetReverseGradientColor(1)));
 	let cbmGetDeviationsColor = Replace(cbmGetDeviationsColor, '^','$');
+
+	// Дэшборд отклонений по метрике
+	for mi = 15 to 35
+		set cbmGet$(mi)MetricTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricShortName);
+		set cbmGet$(mi)DeviationMarker = Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker);
+		set cbmGet$(mi)DeviationMarkerColor = 
+			Pick(
+				Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13),
+					'$(ggffRed)', '$(ggffYellow)', '$(ggffGreen)'
+			);
+	next mi;
+	// Количество отклонений по проектам
+	set cbmGetProjectsDeviationsTitle = 'Отклонений по проектам';
+	set cbmGetProjectsDeviationsNum = Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
+	// Количество отклонений по полке
+	set cbmGetProductsDeviationsTitle = 'Отклонений по полке';
+	set cbmGetProductsDeviationsNum = Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
+	// Сортировка ГОСБ
+	set cbmGetGOSBOrder = ^(cbmGetProjectsDeviationsNum) + ^(cbmGetProductsDeviationsNum);
+	let cbmGetGOSBOrder = Replace(cbmGetGOSBOrder, '^','$');
+	
 end sub;
