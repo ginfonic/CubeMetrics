@@ -262,7 +262,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000018
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
-				(cbm.Direction = 'КРП') and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
@@ -271,7 +271,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000019
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
-				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)')) and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
 				(cbm.YearReport = 2023) and
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
 				cbm.ID
@@ -297,7 +297,23 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
+			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
+			Count(If(
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'Бизнес-эксперименты') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'4)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
+			Count(If(
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'ИИ-трансформация') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'5)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
 			//10000016
 			Null(),
 			//10000017
@@ -319,7 +335,39 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
+			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
+			Count(If(
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'Бизнес-эксперименты') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'4)	Количество бизнес-экспериментов завершенных в текущем году: ' &
+			Count(If(
+				(cbm.Status = 'Завершена') and
+				(cbm.Direction = 'Бизнес-эксперименты') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'5)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
+			Count(If(
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'ИИ-трансформация') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'6)	Количество ИИ-трансформаций завершенных в текущем году: ' &
+			Count(If(
+				(cbm.Status = 'Завершена') and
+				(cbm.Direction = 'ИИ-трансформация') and
+				(cbm.YearReport = 2023) and
+				(cbm.ControlDate < '02.02.2024'),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'7)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
 			//10000019
 			'1)	Количество идей КРП на следующий год: ' &
 			Count(If(
@@ -337,7 +385,23 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'3)	План КРП на текущий год: ' & 
+			'3)	Количество бизнес-экспериментов, реализуемых в следующем году: ' &
+			Count(If(
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'Бизнес-эксперименты') and
+				(cbm.YearReport = 2023) and
+				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'4)	Количество ИИ-трансформаций, реализуемых в следующем году: ' &
+			Count(If(
+				(cbm.Status = 'В работе') and
+				(cbm.Direction = 'ИИ-трансформация') and
+				(cbm.YearReport = 2023) and
+				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
+				cbm.ID
+			)) & ' шт. '& chr(13) &
+			'5)	План КРП на текущий год: ' & 
 			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)'
 		) as cbm.DevElementName
 	resident cbm_stuff
