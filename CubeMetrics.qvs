@@ -291,7 +291,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП, реализуемых в текущем году: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
 				(cbm.Direction = 'КРП') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -299,7 +299,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
 				(cbm.Direction = 'Бизнес-эксперименты') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -307,7 +307,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'4)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
 				(cbm.Direction = 'ИИ-трансформация') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
