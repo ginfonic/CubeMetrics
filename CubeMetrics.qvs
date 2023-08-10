@@ -1433,7 +1433,7 @@ sub cbmSetVariables
 		set cbmGet$(mi)DeviationMarkerColor = 
 			Pick(
 				Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13),
-					'$(ggffRed)', '$(ggffYellow)', '$(ggffGreen)'
+					'$(ggffRed)', '$(ggffGreen)', '$(ggffBlue)'
 			);
 	next mi;
 	// Количество отклонений по проектам
