@@ -143,7 +143,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		10000015, PL комплексных региональных проектов на текущий год, 1, 1.3
 		10000016, Идеи КРП со сроком жизни больше 60 календарных дней, 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
-		10000018, Достаточность КПР для выполнения плана, 1, 1
+		10000018, Достаточность КРП для выполнения плана, 1, 1
 		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
 		10000020, Низкое количество идей КРП на ГОСБ, 1, 0
   ];
@@ -1345,7 +1345,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		10000015, PL КРП на тек. год, Проекты
 		10000016, Идеи КРП > 60 дн., Проекты
 		10000017, Доля нереал. идей КРП, Проекты
-		10000018, Дост. КПР для вып. плана, Проекты
+		10000018, Дост. КРП для вып. плана, Проекты
 		10000019, PL КРП на след. год, Проекты
 		10000020, Низкое кол-во идей КРП, Проекты
 		10000021, Дост. PL продаж, Полка
@@ -1372,6 +1372,17 @@ sub cbmSetVariables
 	let vOrgCode = 99;
 
 	// Дэшборд аггрегированных отклонений
+
+	//Выборка текущего оргкода
+	set cbmCurOrgCode = 
+		^(=If(^(vOrgCode) = 99, 
+			'org_code = {*}',
+			If(Len('^(vOrgCode)') = 2, 
+				'org_tb_code = {^(=Left('^(vOrgCode)', 2))}',
+				'org_code = {^(vOrgCode)}'
+			)
+		));
+	let cbmCurOrgCode = Replace(cbmCurOrgCode, '^', '$');
 
 	//Измерения
 	//Сбербанк
@@ -1419,6 +1430,8 @@ sub cbmSetVariables
 	let cbmGOSBClass = Replace(cbmGOSBClass, '^','$');
 	set cbmGOSBActionOrgCode = If(^(vOrgCode) = org_code, org_tb_code, org_code);
 	let cbmGOSBActionOrgCode = Replace(cbmGOSBActionOrgCode, '^','$');
+	set cbmFlatGOSBActionOrgCode = If(^(vOrgCode) = org_code, 99, org_code);
+	let cbmFlatGOSBActionOrgCode = Replace(cbmFlatGOSBActionOrgCode, '^','$');
 
 	// Мера
 	set cbmGetDeviationsTitle = 'Отклонения';
@@ -1428,14 +1441,51 @@ sub cbmSetVariables
 
 	// Дэшборд отклонений по метрике
 	for mi = 15 to 35
+		// В таблицу
 		set cbmGet$(mi)MetricTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricShortName);
 		set cbmGet$(mi)DeviationMarker = Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker);
 		set cbmGet$(mi)DeviationMarkerColor = 
 			Pick(
-				Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13),
-					'$(ggffRed)', '$(ggffGreen)', '$(ggffBlue)'
+				Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13) + 1,
+					'$(ggffGrey)', '$(ggffRed)', '$(ggffGreen)', '$(ggffBlue)'
 			);
+		// В подвал
+		set cbmGet$(mi)MetricFullTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricName)&' ('&
+			Num(Only({<^(cbmCurOrgCode), cbm.MetricID = {100000$(mi)}>} cbm.MetricValue), '$(ggffNUH)')&')';
+		let cbmGet$(mi)MetricFullTitle = Replace(cbmGet$(mi)MetricFullTitle, '^','$');
+		set cbmGet$(mi)DevElementName = 
+			Only({<^(cbmCurOrgCode), cbm.StructLevel = {'STUFF'}, cbm.MetricID = {100000$(mi)}>} cbm.DevElementName);
+		let cbmGet$(mi)DevElementName = Replace(cbmGet$(mi)DevElementName, '^','$');
 	next mi;
+	// Список комментариев
+	set cbmGetComments = 
+		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b> '&^(cbmGet15DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b> '&^(cbmGet16DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b> '&^(cbmGet17DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet18MetricFullTitle)&'</b> '&^(cbmGet18DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet19MetricFullTitle)&'</b> '&^(cbmGet19DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b> '&^(cbmGet21DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b> '&^(cbmGet22DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b> '&^(cbmGet23DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet24MetricFullTitle)&'</b> '&^(cbmGet24DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet25MetricFullTitle)&'</b> '&^(cbmGet25DevElementName)&'</p>';
+	let cbmGetComments = Replace(cbmGetComments, '^','$');
+	// Список комментариев
+	set cbmGetProjectComments = 
+		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet15DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet16DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet17DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet18MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet18DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet19MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet19DevElementName)&'</p>';
+	let cbmGetProjectComments = Replace(cbmGetProjectComments, '^','$');
+	// Список комментариев
+	set cbmGetProductComments = 
+		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet21DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet22DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet23DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet24MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet24DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet25MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet25DevElementName)&'</p>';
+	let cbmGetProductComments = Replace(cbmGetProductComments, '^','$');
 	// Количество отклонений по проектам
 	set cbmGetProjectsDeviationsTitle = 'Отклонений по проектам';
 	set cbmGetProjectsDeviationsNum = Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
