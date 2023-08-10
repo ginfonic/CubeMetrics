@@ -37,11 +37,14 @@ end sub;
 
 //Создает модель данных
 sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, org_qvd, org_xl)
+	// Дата расчета
+	let v_cbmToday = Today(); //'31.07.2023';
+
 	// Выражения расчета необходимых дат
-	set cbmGetPrevMStart = MonthStart(AddMonths(Today(), -1));
-	set cbmGetPrevMEnd = MonthEnd(AddMonths(Today(), -1));
-	set cbmGetPrevQStart = QuarterStart(AddMonths(Today(), -3));
-	set cbmGetPrevQEnd = QuarterEnd(AddMonths(Today(), -3));
+	set cbmGetPrevMStart = MonthStart(AddMonths('$(v_cbmToday)', -1));
+	set cbmGetPrevMEnd = MonthEnd(AddMonths('$(v_cbmToday)', -1));
+	set cbmGetPrevQStart = QuarterStart(AddMonths('$(v_cbmToday)', -3));
+	set cbmGetPrevQEnd = QuarterEnd(AddMonths('$(v_cbmToday)', -3));
 
 	// Таблица инициатив
 	if '$(cbmConnection)' = '1' then
@@ -247,7 +250,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.Direction = 'Бизнес идеи (КРП)') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024') and 
-				(cbm.CreateDate < Date(Today() - 60)),
+				(cbm.CreateDate < Date('$(v_cbmToday)' - 60)),
 				cbm.ID
 			)),
 			//10000017
@@ -527,8 +530,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000016
 			If((cbm.Direction = 'Бизнес идеи (КРП)') and (cbm.Status = 'В работе') and 
 					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')) and 
-					(cbm.CreateDate < Date(Today() - 60)),
-				cbm.Title & ', дата создания: ' & cbm.CreateDate & ' (в ожидании ' & (Today() - cbm.CreateDate) & ' дн.)'),
+					(cbm.CreateDate < Date('$(v_cbmToday)' - 60)),
+				cbm.Title & ', дата создания: ' & cbm.CreateDate & ' (в ожидании ' & ('$(v_cbmToday)' - cbm.CreateDate) & ' дн.)'),
 			//10000017
 			If((cbm.Direction = 'Бизнес идеи (КРП)') and (cbm.Status = 'Отменена') and 
 					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
@@ -765,34 +768,34 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		not(IsNull($3)) and ($3 <> '') and ($3 <> '-');
 
 	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года относительно текущего квартала: $1 - год, $2 - квартал
-	set sbmIsPastQuarterOnlyThisYear = (($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today()))));
+	set sbmIsPastQuarterOnlyThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 < $(ggffQuarterNo('$(v_cbmToday)'))));
 	//Проверяет квартал и год записи, текущий или будущие ли это кварталы текущего года относительно текущего: $1 - год, $2 - квартал
-	set sbmIsThisAndFutureQuarterThisYear = (($1 = Year(Today())) and ($2 >= $(ggffQuarterNo(Today()))));
+	set sbmIsThisAndFutureQuarterThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 >= $(ggffQuarterNo('$(v_cbmToday)'))));
 	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года относительно текущего квартала
 	//(весь прошлый год, если первый квартал): $1 - год, $2 - квартал
 	set cbmIsPastQuarterThisAndPrevYear = 
-		If($(ggffQuarterNo(Today())) = 1,
-			($1 = Year(Today()) - 1),
-			(($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today()))))
+		If($(ggffQuarterNo('$(v_cbmToday)')) = 1,
+			($1 = Year('$(v_cbmToday)') - 1),
+			(($1 = Year('$(v_cbmToday)')) and ($2 < $(ggffQuarterNo('$(v_cbmToday)'))))
 		);
 	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относительно текущего квартала: $1 - год, $2 - квартал
-	set cbmIsPastQuarterEver = (($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < $(ggffQuarterNo(Today())))));
+	set cbmIsPastQuarterEver = (($1 < Year('$(v_cbmToday)')) or (($1 = Year('$(v_cbmToday)')) and ($2 < $(ggffQuarterNo('$(v_cbmToday)')))));
 	//Проверяет квартал и год записи, прошлые ли это кварталы за всю историю относительтно предыдущего: $1 - год, $2 - квартал
 	set cbmIsPrevPastQuarterEver = 
-		If(($(ggffQuarterNo(Today())) > 2),
+		If(($(ggffQuarterNo('$(v_cbmToday)')) > 2),
 			// Сейчас 3 или 4 квартал: прошлые годы или этот, но запись старше предыдущего квартала
-			(($1 < Year(Today())) or (($1 = Year(Today())) and ($2 < ($(ggffQuarterNo(Today())) - 1)))),
-			If($(ggffQuarterNo(Today())) = 2,
+			(($1 < Year('$(v_cbmToday)')) or (($1 = Year('$(v_cbmToday)')) and ($2 < ($(ggffQuarterNo('$(v_cbmToday)')) - 1)))),
+			If($(ggffQuarterNo('$(v_cbmToday)')) = 2,
 				// Сейчас 2 квартал: прошлые годы 
-				($1 < Year(Today())),
+				($1 < Year('$(v_cbmToday)')),
 				// Сейчас 1 квартал: позапрошлные годы или прошлый, но запись старше 4 квартала
-				(($1 < (Year(Today()) - 1)) or (($1 = (Year(Today()) - 1)) and ($2 < 4)))
+				(($1 < (Year('$(v_cbmToday)') - 1)) or (($1 = (Year('$(v_cbmToday)') - 1)) and ($2 < 4)))
 			)
 		);
 	// Проверяет год записи, текущий ли это год: 1 - год
-	set cbmIsThisYear = ($1 = Year(Today()));
+	set cbmIsThisYear = ($1 = Year('$(v_cbmToday)'));
 	// Проверяет квартал записи, четвертый ли он текущего года: $1 - год, $2 - квартал
-	set sbmIs4QThisYear = (($1 = Year(Today())) and ($2 = 4));
+	set sbmIs4QThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 = 4));
 	// Проверяет, не ГЧП ли продукт: $1 - продукт
 	set cbmIsNotGChP = (Left($1, 3) <> 'ГЧП');
 	// Проверяет статус реализации
@@ -944,7 +947,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	//Добавляет данные ориентира
 	left join(cbm_fbs_10000021) load
     org_code,
-		Sum(Pick(Match($(ggffQuarterNo(Today()))&Year(Today()), '32023', '42023', '12024') + 1,
+		Sum(Pick(Match($(ggffQuarterNo('$(v_cbmToday)'))&Year('$(v_cbmToday)'), '32023', '42023', '12024') + 1,
 			0, "2 кв", "3 кв", "4 кв"
 		)) as cbm_fbs.Milestone
 		// Sum(Pick(Match($(ggffQuarterNo('10.02.2024'))&Year('10.02.2024'), '32023', '42023', '12024') + 1,
