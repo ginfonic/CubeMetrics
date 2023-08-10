@@ -238,7 +238,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000015
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
-				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or 
+					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
@@ -274,7 +275,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000019
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
-				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
+				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or 
+					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
 				(cbm.YearReport = 2023) and
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
 				cbm.ID
@@ -330,7 +332,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'2)	Количество КРП завершенных в текущем году: ' &
+			'2)	Количество КРП, завершенных в текущем году: ' &
 			Count(If(
 				(cbm.Status = 'Завершена') and
 				(cbm.Direction = 'КРП') and
@@ -346,7 +348,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'4)	Количество бизнес-экспериментов завершенных в текущем году: ' &
+			'4)	Количество бизнес-экспериментов, завершенных в текущем году: ' &
 			Count(If(
 				(cbm.Status = 'Завершена') and
 				(cbm.Direction = 'Бизнес-эксперименты') and
@@ -362,7 +364,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'6)	Количество ИИ-трансформаций завершенных в текущем году: ' &
+			'6)	Количество ИИ-трансформаций, завершенных в текущем году: ' &
 			Count(If(
 				(cbm.Status = 'Завершена') and
 				(cbm.Direction = 'ИИ-трансформация') and
@@ -441,7 +443,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'2)	Количество КРП в текущем году в статусе реализуется и завершена: '&
+			'2)	Количество КРП в текущем году в статусе "В работе" и "Завершена": '&
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
 				(cbm.Direction = 'КРП') and
@@ -1362,227 +1364,6 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	resident cbm_metrics_final_lookup;
 	drop table cbm_metrics_final_lookup;
 
-	////////////////////////////////////////////////////////////////////////////////
-
-	// Меняет названия столбцов на нужные
-	// cbm_out:
-	// noconcatenate load 
-	// 	cbm.MetricID as METRIC_ID,
-	// 	cbm.MetricName as METRIC_NAME,
-	// 	cbm.MetricDirection as METRIC_DIRECT,
-	// 	// Делает числом
-	// 	cbm.MetricPlanValue * 1 as METRIC_PLAN_VALUE,
-	// 	cbm.StructLevel as STRUCT_LEVEL,
-	// 	cbm.ReportDate as REPORT_DATE,
-	// 	cbm.TBCode as TB_ID,
-	// 	cbm.TBName as TB_NAME,
-	// 	cbm.GOSBCode as GOSB_ID,
-	// 	cbm.GOSBName as GOSB_NAME,
-	// 	cbm.DevElementName as DEV_ELEMENT_NAME,
-	// 	cbm.MetricValue as METRIC_VALUE,
-	// 	cbm.ElementType as ELEMENT_TYPE,
-	// 	cbm.ElementID as ELEMENT_ID,
-	// 	cbm.Segment as SEGMENT,
-	// 	cbm.LoadID as LOAD_ID,
-	// 	cbm.DeviationMarker as DEVIATION_MARKER
-	// resident cbm_data;
-	// drop table cbm_data;
-
-	//////////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////////////////////////////////////////////////
-	// Легаси часть, основанная на загрузке Excel от Леши
-	// // Получает элементы
-	// if '$(cbmConnection)' = '1' then
-	// 	//QVD
-	// 	cbm_data:
-	// 	noconcatenate load
-	// 		METRIC_ID,
-	// 		METRIC_NAME,
-	// 		TB_ID,
-	// 		GOSB_ID,
-	// 		METRIC_VALUE as METRIC_VALUE_1,
-	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-	// 		REPORT_DATE as REPORT_DATE_1,
-	// 		STRUCT_LEVEL,
-	// 		DEV_ELEMENT_NAME
-	// 	from [$(cbm_element_xl)] (qvd);
-
-	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
-	// else
-	// 	//Excel
-	// 	cbm_data:
-	// 	noconcatenate load
-	// 		METRIC_ID,
-	// 		METRIC_NAME,
-	// 		TB_ID,
-	// 		GOSB_ID,
-	// 		METRIC_VALUE as METRIC_VALUE_1,
-	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-	// 		REPORT_DATE as REPORT_DATE_1,
-	// 		STRUCT_LEVEL,
-	// 		DEV_ELEMENT_NAME
-	// 	from [$(cbm_element_xl)] (ooxml, embedded labels, table is Sheet1);
-
-	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
-	// end if;
-
-	// // Получает команду
-	// if '$(cbmConnection)' = '1' then
-	// 	//QVD
-	// 	concatenate(cbm_data) load
-	// 		METRIC_ID,
-	// 		METRIC_NAME,
-	// 		TB_ID,
-	// 		GOSB_ID,
-	// 		METRIC_VALUE as METRIC_VALUE_1,
-	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-	// 		REPORT_DATE as REPORT_DATE_1,
-	// 		"COMMENT" as DEV_ELEMENT_NAME,
-	// 		STRUCT_LEVEL,
-	// 		METRIC_DIRECT as METRIC_DIRECT_1
-	// 	from [$(cbm_stuff_xl)] (qvd);
-
-	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
-	// else
-	// 	//Excel
-	// 	concatenate(cbm_data) load
-	// 		METRIC_ID,
-	// 		METRIC_NAME,
-	// 		TB_ID,
-	// 		GOSB_ID,
-	// 		METRIC_VALUE as METRIC_VALUE_1,
-	// 		METRIC_PLAN_VALUE as METRIC_PLAN_VALUE_1,
-	// 		REPORT_DATE as REPORT_DATE_1,
-	// 		"COMMENT" as DEV_ELEMENT_NAME,
-	// 		STRUCT_LEVEL,
-	// 		METRIC_DIRECT as METRIC_DIRECT_1
-	// 	from [$(cbm_stuff_xl)] (ooxml, embedded labels, table is Sheet1);
-
-	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
-	// end if;
-
-	// // Расчитывает значение перцентилей 0,75 и 0,25
-	// left join(cbm_data) load
-	// 	METRIC_ID,
-	// 	Fractile(METRIC_VALUE_1, 0.75) as PERCENTILE75,
-	// 	Fractile(METRIC_VALUE_1, 0.25) as PERCENTILE25
-	// resident cbm_data
-	// where (
-	// 	(STRUCT_LEVEL = 'STUFF') and 
-	// 	(
-	// 		((METRIC_ID = 10000015) and (METRIC_VALUE_1 >= 1.5)) or 
-	// 		((METRIC_ID = 10000017) and (METRIC_VALUE_1 > 0)) or 
-	// 		((METRIC_ID = 10000018) and (METRIC_VALUE_1 >= 1)) or 
-	// 		((METRIC_ID = 10000019) and (METRIC_VALUE_1 >= 0.7)) or
-	// 		(METRIC_ID = 10000020)
-	// 	)
-	// )
-	// group by METRIC_ID;
-
-	// // Выражения расчета необходимых дат
-	// set cbmGetPrevMStart1 = MonthStart(AddMonths(REPORT_DATE_1, -1));
-	// set cbmGetPrevMEnd1 = MonthEnd(AddMonths(REPORT_DATE_1, -1));
-	// set cbmGetPrevQStart1 = QuarterStart(AddMonths(REPORT_DATE_1, -3));
-	// set cbmGetPrevQEnd1 = QuarterEnd(AddMonths(REPORT_DATE_1, -3));
-
-	// temp:
-	// noconcatenate load *,
-	// // Добавляет пустые и стандартные поля
-	// '' as ELEMENT_TYPE, 
-	// '' as ELEMENT_ID,
-	// 'EXT_FILE' as SEGMENT ,
-	// // Добавляет поле LOAD_ID из метрики и даты отчета
-	// If((METRIC_ID = 10000018) or (METRIC_ID = 10000019),
-	// 	METRIC_ID&'_'&Date($(cbmGetPrevQStart1), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd1), 'YYYYMMDD'),
-	// 	METRIC_ID&'_'&Date($(cbmGetPrevMStart1), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd1), 'YYYYMMDD')
-	// ) as LOAD_ID, 
-	// // Рассчитывает поле DEVIATION_MARKER
-	// If(not $(ggffIsEmpty(METRIC_VALUE_1)),
-	// 	Pick(Match(METRIC_ID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
-	// 		// 10000015
-	// 		If(METRIC_VALUE_1 < 1.5, 
-	// 			1, 
-	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
-	// 				13,
-	// 				0
-	// 			)
-	// 		),
-	// 		// 10000016
-	// 		If(METRIC_VALUE_1 > 0, 1, 0), 
-	// 		// 10000017
-	// 		If(METRIC_VALUE_1 = 0, 
-	// 			13, 
-	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
-	// 				1,
-	// 				0
-	// 			)
-	// 		),
-	// 		// 10000018
-	// 		If(METRIC_VALUE_1 < 1, 
-	// 			1, 
-	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
-	// 				13,
-	// 				0
-	// 			)
-	// 		),
-	// 		// 10000019
-	// 		If(METRIC_VALUE_1 < 0.7, 
-	// 			1, 
-	// 			If(METRIC_VALUE_1 >= PERCENTILE75,
-	// 				13,
-	// 				0
-	// 			)
-	// 		),
-	// 		// 10000020
-	// 		If(METRIC_VALUE_1 >= PERCENTILE75, 
-	// 			13, 
-	// 			If(METRIC_VALUE_1 <= PERCENTILE25,
-	// 				1,
-	// 				0
-	// 			)
-	// 		))
-	// 	) as DEVIATION_MARKER_1,
-	// Date(Floor($(cbmGetPrevMEnd1))) as REPORT_DATE,
-	// TB_ID&GOSB_ID as ORG_CODE
-	// resident cbm_data;
-	// drop table cbm_data;
-	// rename table temp to cbm_data;
-	// drop fields PERCENTILE75, PERCENTILE25, REPORT_DATE_1;
-
-	// //Добавляет параметры ГОСБ
-	// left join(cbm_data) load
-	// 	// gosb.TBCode as TB_ID,
-	// 	// gosb.GOSBCode as GOSB_ID,
-	// 	org_code as ORG_CODE,
-	// 	org_tb_name as TB_NAME,
-	// 	org_gosb_name as GOSB_NAME
-	// resident org;
-	// drop table org;
-
-	// // Заполняет пустые поля из таблицы Elements данными из Stuff
-	// left join(cbm_data) load 
-	// 	REPORT_DATE,
-	// 	ORG_CODE,
-	// 	METRIC_ID,
-	// 	Max(METRIC_VALUE_1) as METRIC_VALUE,
-	// 	Max(METRIC_PLAN_VALUE_1) as METRIC_PLAN_VALUE,
-	// 	Max(METRIC_DIRECT_1) as METRIC_DIRECT,
-	// 	Max(DEVIATION_MARKER_1) as DEVIATION_MARKER
-	// resident cbm_data
-	// group by REPORT_DATE, ORG_CODE, METRIC_ID;
-	// drop fields METRIC_VALUE_1, METRIC_PLAN_VALUE_1, METRIC_DIRECT_1, DEVIATION_MARKER_1, ORG_CODE;
-
-	// // //Сохраняет таблицы
-	// // for I=15 to 20
-	// // 	cbm_data_$(I):
-	// // 	noconcatenate load * resident cbm_data where METRIC_ID = '100000'&$(I);
-	// // 	store cbm_data_$(I) into [lib://Data/cbm_out_$(I).csv] (TXT);
-	// // 	drop table cbm_data_$(I);
-	// // next;
 end sub;
 
 //Создает переменные и выражения
