@@ -1443,7 +1443,11 @@ sub cbmSetVariables
 	for mi = 15 to 35
 		// В таблицу
 		set cbmGet$(mi)MetricTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricShortName);
-		set cbmGet$(mi)DeviationMarker = Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker);
+		set cbmGet$(mi)DeviationMarker = 
+			If(Dimensionality() = 0,
+				Sum(Aggr(If(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker) = 1, 1, 0), org_gosb_code)), 
+				Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker)
+			);
 		set cbmGet$(mi)DeviationMarkerColor = 
 			Pick(
 				Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13) + 1,
@@ -1457,6 +1461,8 @@ sub cbmSetVariables
 			Only({<^(cbmCurOrgCode), cbm.StructLevel = {'STUFF'}, cbm.MetricID = {100000$(mi)}>} cbm.DevElementName);
 		let cbmGet$(mi)DevElementName = Replace(cbmGet$(mi)DevElementName, '^','$');
 	next mi;
+	// Вес шрифта для итого
+	set cbmGetTotalWeight = If(Dimensionality() = 0, '800', '');
 	// Список комментариев
 	set cbmGetComments = 
 		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b> '&^(cbmGet15DevElementName)&'</p>'&
@@ -1488,10 +1494,21 @@ sub cbmSetVariables
 	let cbmGetProductComments = Replace(cbmGetProductComments, '^','$');
 	// Количество отклонений по проектам
 	set cbmGetProjectsDeviationsTitle = 'Отклонений по проектам';
-	set cbmGetProjectsDeviationsNum = Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
+	set cbmGetProjectsDeviationsNum = 
+		If(Dimensionality() <> 0, 
+			Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName),
+			Sum(Aggr(Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code))
+		);
 	// Количество отклонений по полке
 	set cbmGetProductsDeviationsTitle = 'Отклонений по полке';
-	set cbmGetProductsDeviationsNum = Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
+	set cbmGetProductsDeviationsNum = 
+		If(Dimensionality() <> 0, 
+			Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName),
+			Sum(Aggr(Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code))
+		);
+	// Количество отклонений всего
+	set cbmGetTotalDeviationsTitle = 'Отклонений всего';
+	set cbmGetTotalDeviationsNum = Column(7) + Column(13);
 	// Сортировка ГОСБ
 	set cbmGetGOSBOrder = ^(cbmGetProjectsDeviationsNum) + ^(cbmGetProductsDeviationsNum);
 	let cbmGetGOSBOrder = Replace(cbmGetGOSBOrder, '^','$');
