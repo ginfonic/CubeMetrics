@@ -1478,6 +1478,7 @@ sub cbmSetVariables
 	let cbmGetComments = Replace(cbmGetComments, '^','$');
 	// Список комментариев
 	set cbmGetProjectComments = 
+		'<p style="font-size: 20px; font-weight: 800; ">Проекты</p>'&
 		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet15DevElementName)&'</p>'&
 		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet16DevElementName)&'</p>'&
 		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet17DevElementName)&'</p>'&
@@ -1486,6 +1487,7 @@ sub cbmSetVariables
 	let cbmGetProjectComments = Replace(cbmGetProjectComments, '^','$');
 	// Список комментариев
 	set cbmGetProductComments = 
+		'<p style="font-size: 20px; font-weight: 800; ">Полка</p>'&
 		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet21DevElementName)&'</p>'&
 		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet22DevElementName)&'</p>'&
 		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet23DevElementName)&'</p>'&
