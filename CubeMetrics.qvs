@@ -1449,9 +1449,11 @@ sub cbmSetVariables
 				Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker)
 			);
 		set cbmGet$(mi)DeviationMarkerColor = 
-			Pick(
-				Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13) + 1,
-					'$(ggffGrey)', '$(ggffRed)', '$(ggffGreen)', '$(ggffBlue)'
+			If(Dimensionality() <> 0,
+				Pick(
+					Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13) + 1,
+						'$(ggffGrey)', '$(ggffRed)', '$(ggffGreen)', '$(ggffBlue)'
+				)
 			);
 		// В подвал
 		set cbmGet$(mi)MetricFullTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricName)&' ('&
