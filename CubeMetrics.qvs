@@ -29,6 +29,7 @@ sub cbmMergeMetric(metric_code)
 		cbm_fbs.StructLevel as cbm.StructLevel,
 		cbm_fbs.DevElementName as cbm.DevElementName,
 		cbm_fbs.MetricValue as cbm.MetricValue,
+		cbm_fbs.ResultEvaluation as cbm.ResultEvaluation,
 		cbm_fbs.DeviationMarker as cbm.DeviationMarker,
 		cbm_fbs.LoadID as cbm.LoadID
 	resident cbm_fbs_$(metric_code);
@@ -424,7 +425,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		// Значение метрики 10000020
 		(
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status =  'Завершена') or (cbm.Status = 'В работе')) and
 				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)')) and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -552,7 +553,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	drop table cbm_data;
 	rename table temp to cbm_data;
 
-	// Добавляет в таблицу инициатив значение метрики из таблицы команды
+	// Добавляет в таблицу инициатив значение и единицу измерения метрики из таблицы команды
 	left join(cbm_data) load
 		org_code,
 		cbm.MetricID,
@@ -641,7 +642,35 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 					)
 				)
 			)
-		) as cbm.DeviationMarker
+		) as cbm.DeviationMarker,
+		// Оценка результата
+		If(not $(ggffIsEmpty(cbm.MetricValue)),
+			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),		
+				// 10000015
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
+				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
+				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)',
+				// 10000016
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffNUM)')&
+				' шт.</b> Цель - не больше <b>'&Num(cbm.MetricPlanValue, '$(ggffNUM)')&' шт.</b>)',
+				// 10000017
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
+				'</b>. Цель - не больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&
+				'</b>. Ориентир - <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&'</b>)',
+				// 10000018
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
+				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
+				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)',
+				// 10000019
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
+				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
+				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)',
+				// 10000020
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
+				'</b>. Цель - больше <b>'&Num(cbm.Percentile25, '$(ggffPCT)')&
+				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)'
+			)
+		) as cbm.ResultEvaluation
 	resident cbm_data;
 	drop table cbm_data;
 	rename table temp to cbm_data;
@@ -979,7 +1008,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		If((cbm_fbs.Milestone > 0), 
 			(cbm_fbs.FactPastQuarters + cbm_fbs.PlanThisAndFutureQuarters) / cbm_fbs.Milestone,
 			// Если нет ориентира, то выше границы плана
-			'1,11'
+			'1,10'
 		) as cbm_fbs.MetricValue,
 		'10000021_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID
 	resident cbm_fbs_10000021;
@@ -995,6 +1024,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	// Добавляет поле DeviationMarker
 	temp:
 	noconcatenate load *,
+		'(Факт - <b>'&Num(cbm_fbs.MetricValue, '$(ggffPCT)')&
+			'</b>. Цель - не меньше <b>'&Num(cbm_fbs.MetricPlanValue, '$(ggffPCT)')&
+			'</b>. Ориентир - больше <b>'&Num(cbm_fbs.Percentile75, '$(ggffPCT)')&'</b>)' 
+		as cbm_fbs.ResultEvaluation,
 		If((cbm_fbs.MetricValue < cbm_fbs.MetricPlanValue), 
 			1, 
 			If((cbm_fbs.MetricValue > cbm_fbs.Percentile75),
@@ -1018,6 +1051,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	// Получает значение метрики 10000022
 	temp:
 	noconcatenate load *,
+		'(Факт - <b>'&Num(cbm_fbs.MetricValue, '$(ggffPCD)')&
+			'</b>. Цель - не больше <b>'&Num(cbm_fbs.MetricPlanValue, '$(ggffPCD)')&'</b>)' 
+		as cbm_fbs.ResultEvaluation,
 		If((cbm_fbs.MetricValue > cbm_fbs.MetricPlanValue), 1, 0) as cbm_fbs.DeviationMarker;
 	noconcatenate load *,
 		10000022 as cbm_fbs.MetricID,
@@ -1074,6 +1110,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'Боттом 25% - '&cbm_fbs.Percentile25&', топ 25% - '&cbm_fbs.Percentile75 as cbm_fbs.DevElementName,
 		cbm_fbs.IncomeFact as cbm_fbs.MetricValue,
 		'10000023_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
+		'(Факт - <b>'&Num(cbm_fbs.IncomeFact / 1000000, '$(ggffNUH)')&
+			' млн руб.</b> Цель - больше <b>'&Num(cbm_fbs.Percentile25 / 1000000, '$(ggffNUH)')&
+			' млн руб.</b> Ориентир - больше <b>'&Num(cbm_fbs.Percentile75 / 1000000, '$(ggffNUH)')&' млн руб.</b>)' 
+		as cbm_fbs.ResultEvaluation,
 		If((cbm_fbs.IncomeFact > cbm_fbs.Percentile75), 
 			13, 
 			If((cbm_fbs.IncomeFact <= cbm_fbs.Percentile25) and ((cbm_fbs.Percentile25 <> 0) or (cbm_fbs.Percentile75 <> 0)),
@@ -1118,6 +1158,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			', топ 25% - '&Num(cbm_fbs.Percentile75, '#.0%', '.', '') as cbm_fbs.DevElementName,
 		cbm_fbs.Penetration as cbm_fbs.MetricValue,
 		'10000024_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
+		'(Факт - <b>'&Num(cbm_fbs.Penetration, '$(ggffPCD)')&
+			'</b>. Цель - больше <b>'&Num(cbm_fbs.Percentile25, '$(ggffPCD)')&
+			'</b>. Ориентир - больше <b>'&Num(cbm_fbs.Percentile75, '$(ggffPCD)')&'</b>)' 
+		as cbm_fbs.ResultEvaluation,
 		If((cbm_fbs.Penetration > cbm_fbs.Percentile75), 
 			13, 
 			If((cbm_fbs.Penetration <= cbm_fbs.Percentile25) and ((cbm_fbs.Percentile25 <> 0) or (cbm_fbs.Percentile75 <> 0)),
@@ -1163,6 +1207,13 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		as cbm_fbs.DevElementName,
 		cbm_fbs.PenetrationGrowth as cbm_fbs.MetricValue,
 		'10000025_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
+		'(Доля - <b>'&Num(cbm_fbs.Penetration, '$(ggffPCD)')&
+			'</b>. Прирост доли <b>'&Num(cbm_fbs.PenetrationGrowth * 100, '$(ggffPPT)')&
+			'</b>. Цель - доля больше <b>'&Num(cbm_fbs.PenetrationPercentile50, '$(ggffPCD)')&
+			'</b> или прирост доли больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&
+			'</b>. Ориентир - доля больше <b>'&Num(cbm_fbs.PenetrationPercentile50, '$(ggffPCD)')&
+			'</b> и прирост доли больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&'</b>)'
+		as cbm_fbs.ResultEvaluation,
 		If((cbm_fbs.Penetration > cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth > cbm_fbs.PenetrationGrowthPercentile50), 
 			13, 
 			If((cbm_fbs.Penetration <= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50) and 
@@ -1284,6 +1335,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	// Получает значение метрики
 	temp:
 	noconcatenate load *,
+		'(Факт - <b>'&Interval(cbm_trf.MetricValue/(3600*24),'h:mm:ss')&'. Цель - больше 0'&
+			'</b>. Ориентир - больше <b>'&Interval(cbm_trf.Percentile75/(3600*24),'h:mm:ss')&'</b>)' 
+		as cbm_trf.ResultEvaluation;
+	noconcatenate load *,
 		10000035 as cbm_trf.MetricID,
 		'Посещаемость платформы ПРБР' as cbm_trf.MetricName,
 		1 as cbm_trf.MetricDirection,
@@ -1331,6 +1386,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm_trf.StructLevel as cbm.StructLevel,
 		cbm_trf.DevElementName as cbm.DevElementName,
 		cbm_trf.MetricValue as cbm.MetricValue,
+		cbm_trf.ResultEvaluation as cbm.ResultEvaluation,
 		cbm_trf.DeviationMarker as cbm.DeviationMarker,
 		cbm_trf.LoadID as cbm.LoadID
 	resident cbm_trf;
@@ -1456,9 +1512,9 @@ sub cbmSetVariables
 				)
 			);
 		// В подвал
-		set cbmGet$(mi)MetricFullTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricName)&' ('&
-			Num(Only({<^(cbmCurOrgCode), cbm.MetricID = {100000$(mi)}>} cbm.MetricValue), '$(ggffNUH)')&')';
-		let cbmGet$(mi)MetricFullTitle = Replace(cbmGet$(mi)MetricFullTitle, '^','$');
+		set cbmGet$(mi)MetricFullTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricName);
+		set cbmGet$(mi)MetricValue = Only({<^(cbmCurOrgCode), cbm.MetricID = {100000$(mi)}>} cbm.ResultEvaluation);
+		let cbmGet$(mi)MetricValue = Replace(cbmGet$(mi)MetricValue, '^','$');
 		set cbmGet$(mi)DevElementName = 
 			Only({<^(cbmCurOrgCode), cbm.StructLevel = {'STUFF'}, cbm.MetricID = {100000$(mi)}>} cbm.DevElementName);
 		let cbmGet$(mi)DevElementName = Replace(cbmGet$(mi)DevElementName, '^','$');
@@ -1481,20 +1537,20 @@ sub cbmSetVariables
 	// Список комментариев
 	set cbmGetProjectComments = 
 		'<p style="font-size: 20px; font-weight: 800; ">Проекты</p>'&
-		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet15DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet16DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet17DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet18MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet18DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet19MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet19DevElementName)&'</p>';
+		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b> '&^(cbmGet15MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet15DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b> '&^(cbmGet16MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet16DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b> '&^(cbmGet17MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet17DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet18MetricFullTitle)&'</b> '&^(cbmGet18MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet18DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet19MetricFullTitle)&'</b> '&^(cbmGet19MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet19DevElementName)&'</p>';
 	let cbmGetProjectComments = Replace(cbmGetProjectComments, '^','$');
 	// Список комментариев
 	set cbmGetProductComments = 
 		'<p style="font-size: 20px; font-weight: 800; ">Полка</p>'&
-		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet21DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet22DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet23DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet24MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet24DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet25MetricFullTitle)&'</b></p><p style="margin-left: 20px; ">'&^(cbmGet25DevElementName)&'</p>';
+		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b> '&^(cbmGet21MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet21DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b> '&^(cbmGet22MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet22DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b> '&^(cbmGet23MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet23DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet24MetricFullTitle)&'</b> '&^(cbmGet24MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet24DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet25MetricFullTitle)&'</b> '&^(cbmGet25MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet25DevElementName)&'</p>';
 	let cbmGetProductComments = Replace(cbmGetProductComments, '^','$');
 	// Количество отклонений по проектам
 	set cbmGetProjectsDeviationsTitle = 'Отклонений по проектам';
