@@ -1468,14 +1468,17 @@ sub cbmSetVariables
 
 	//ГОСБ
 	set cbmGetGOSB =
-		If('^(vOrgCode)' = '99', 
-			org_gosb_name_short,
-			If(Len('^(vOrgCode)') = 2, 
-				if(Left('^(vOrgCode)', 2) = org_tb_code, 
-					org_gosb_name_short
-				),
-				If('^(vOrgCode)' = org_code, 
-					org_gosb_name_short
+		// Кроме Москвы и Крыма
+		If((org_code <> 3838) and (org_code <> 529052),
+			If('^(vOrgCode)' = '99', 
+				org_gosb_name_short,
+				If(Len('^(vOrgCode)') = 2, 
+					if(Left('^(vOrgCode)', 2) = org_tb_code, 
+						org_gosb_name_short
+					),
+					If('^(vOrgCode)' = org_code, 
+						org_gosb_name_short
+					)
 				)
 			)
 		);
