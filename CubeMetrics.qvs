@@ -407,7 +407,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'5)	План КРП на текущий год: ' & 
+			'5)	Ориентир КРП на текущий год: ' & 
 			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)'
 		) as cbm.DevElementName
 	resident cbm_stuff
@@ -1001,9 +1001,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'Факт продаж продуктов полки - '&cbm_fbs.FactPastQuarters&
-		', PL продаж продуктов полки - '&cbm_fbs.PlanThisAndFutureQuarters&
-			', ориентир продаж - '&cbm_fbs.Milestone 
+		'1) Факт продаж продуктов полки - '&cbm_fbs.FactPastQuarters&' шт. '&chr(13)&
+		'2) PL продаж продуктов полки - '&cbm_fbs.PlanThisAndFutureQuarters&' шт. '&chr(13)&
+		'3) Ориентир продаж - '&cbm_fbs.Milestone&' шт.'
 		as cbm_fbs.DevElementName,
 		If((cbm_fbs.Milestone > 0), 
 			(cbm_fbs.FactPastQuarters + cbm_fbs.PlanThisAndFutureQuarters) / cbm_fbs.Milestone,
@@ -1065,8 +1065,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'PL продаж продуктов полки на 4 кв. - '&cbm_fbs.Plan4QThisYear&
-			', годовой PL продаж продуктов полки - '&cbm_fbs.PlanThisYear 
+		'1) PL продаж продуктов полки на 4 кв. - '&cbm_fbs.Plan4QThisYear&' шт. '&chr(13)&
+		'2) Годовой PL продаж продуктов полки - '&cbm_fbs.PlanThisYear&' шт.'
 		as cbm_fbs.DevElementName,
 		If((cbm_fbs.PlanThisYear > 0), 
 			cbm_fbs.Plan4QThisYear / cbm_fbs.PlanThisYear,
@@ -1107,7 +1107,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'Боттом 25% - '&cbm_fbs.Percentile25&', топ 25% - '&cbm_fbs.Percentile75 as cbm_fbs.DevElementName,
+		'1) Граница боттом 25% - '&cbm_fbs.Percentile25&' руб. '&chr(13)&
+		'2) Граница топ 25% - '&cbm_fbs.Percentile75&' руб.'
+		as cbm_fbs.DevElementName,
 		cbm_fbs.IncomeFact as cbm_fbs.MetricValue,
 		'10000023_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
 		'(Факт - <b>'&Num(cbm_fbs.IncomeFact / 1000000, '$(ggffNUH)')&
@@ -1154,8 +1156,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'Боттом 25% - '&Num(cbm_fbs.Percentile25, '#.0%', '.', '')&
-			', топ 25% - '&Num(cbm_fbs.Percentile75, '#.0%', '.', '') as cbm_fbs.DevElementName,
+		'1) Граница боттом 25% - '&Num(cbm_fbs.Percentile25, '#.0%', '.', '')&chr(13)&
+		'2) Граница топ 25% - '&Num(cbm_fbs.Percentile75, '#.0%', '.', '') 
+		as cbm_fbs.DevElementName,
 		cbm_fbs.Penetration as cbm_fbs.MetricValue,
 		'10000024_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
 		'(Факт - <b>'&Num(cbm_fbs.Penetration, '$(ggffPCD)')&
@@ -1202,8 +1205,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'Медиана фактической доли продаж - '&Num(cbm_fbs.PenetrationPercentile50, '#.0%', '.', '')&
-			', медиана темпа прироста фактической доли продаж - '&Num(cbm_fbs.PenetrationGrowthPercentile50, '#.0%', '.', '') 
+		'1) Фактическая доля продаж продуктов полки - '&Num(cbm_fbs.Penetration, '#.0%', '.', '')&chr(13)&
+		'2) Медиана фактической доли продаж продуктов полки по кластеру - '&Num(cbm_fbs.PenetrationPercentile50, '#.0%', '.', '')&chr(13)&
+		'3) Темп прироста доли продаж продуктов полки - '&Num(cbm_fbs.PenetrationGrowth * 100, '#.0пп', '.', '')&chr(13)&
+		'4) Медиана темпа прироста фактической доли продаж продуктов полки по кластеру - '&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '#.0пп', '.', '') 
 		as cbm_fbs.DevElementName,
 		cbm_fbs.PenetrationGrowth as cbm_fbs.MetricValue,
 		'10000025_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
