@@ -1446,6 +1446,10 @@ sub cbmSetVariables
 		));
 	let cbmCurOrgCode = Replace(cbmCurOrgCode, '^', '$');
 
+	//Организационный уровень: 1 - СБ, 2 - ТБ, 3 - ГОСБ
+	set cbmOrgLevel = If('^(vOrgCode)' = '99', 1, If(Len('^(vOrgCode)') = 2, 2, 3));
+	let cbmOrgLevel = Replace(cbmOrgLevel, '^','$');
+
 	//Измерения
 	//Сбербанк
 	set cbmGetSberbank = If('^(vOrgCode)' = '99', 'Сбербанк', org_tb_name_short);
@@ -1563,18 +1567,32 @@ sub cbmSetVariables
 	let cbmGetProductComments = Replace(cbmGetProductComments, '^','$');
 	// Количество отклонений по проектам
 	set cbmGetProjectsDeviationsTitle = 'Отклонений по проектам';
-	set cbmGetProjectsDeviationsNum = 
-		If(Dimensionality() <> 0, 
-			Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName),
-			Sum(Aggr(Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code))
-		);
+	set cbmGetGOSBProjectsDeviationsNum = Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
+	set cbmGetTBProjectsDeviationsNum = Sum(Aggr(Count({<cbm.Category = {'Проекты'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code));
+	set cbmGetProjectsDeviationsNum = If(Dimensionality() <> 0, ^(cbmGetGOSBProjectsDeviationsNum), ^(cbmGetTBProjectsDeviationsNum));
+	let cbmGetProjectsDeviationsNum = Replace(cbmGetProjectsDeviationsNum, '^','$');
+	// Ранг отклонений по проектам
+	set cbmGetGOSBProjectsDeviationsRank = Rank(Aggr(^(cbmGetGOSBProjectsDeviationsNum), org_gosb_code), 1, 1);
+	let cbmGetGOSBProjectsDeviationsRank = Replace(cbmGetGOSBProjectsDeviationsRank, '^','$');
+	set cbmGetTBProjectsDeviationsRank = Rank(Aggr(^(cbmGetTBProjectsDeviationsNum), org_gosb_code, org_tb_code), 1, 1);
+	let cbmGetTBProjectsDeviationsRank = Replace(cbmGetTBProjectsDeviationsRank, '^','$');
+	set cbmGetProjectsDeviationsRank = If(Dimensionality() <> 0, ^(cbmGetGOSBProjectsDeviationsRank), ^(cbmGetTBProjectsDeviationsRank));
+	let cbmGetProjectsDeviationsRank = Replace(cbmGetProjectsDeviationsRank, '^','$');
 	// Количество отклонений по полке
 	set cbmGetProductsDeviationsTitle = 'Отклонений по полке';
+	set cbmGetGOSBProductsDeviationsNum = Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
+	set cbmGetTBProductsDeviationsNum = Sum(Aggr(Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code));
 	set cbmGetProductsDeviationsNum = 
-		If(Dimensionality() <> 0, 
-			Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName),
-			Sum(Aggr(Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code))
-		);
+		 ^(cbmGetGOSBProductsDeviationsNum), ^(cbmGetTBProductsDeviationsNum));
+	let cbmGetProductsDeviationsNum = Replace(cbmGetProductsDeviationsNum, '^','$');
+	// Ранг отклонений по полке
+	set cbmGetGOSBProductsDeviationsRank = Rank(Aggr(^(cbmGetGOSBProductsDeviationsNum), org_gosb_code), 1, 1);
+	let cbmGetGOSBProductsDeviationsRank = Replace(cbmGetGOSBProductsDeviationsRank, '^','$');
+	set cbmGetTBProductsDeviationsRank = Rank(Aggr(^(cbmGetTBProductsDeviationsNum), org_gosb_code, org_tb_code), 1, 1);
+	let cbmGetTBProductsDeviationsRank = Replace(cbmGetTBProductsDeviationsRank, '^','$');
+	set cbmGetProductsDeviationsRank = If(Dimensionality() <> 0, ^(cbmGetGOSBProductsDeviationsRank), ^(cbmGetTBProductsDeviationsRank));
+	let cbmGetProductsDeviationsRank = Replace(cbmGetProductsDeviationsRank, '^','$');
+	
 	// Количество отклонений всего
 	set cbmGetTotalDeviationsTitle = 'Отклонений всего';
 	set cbmGetTotalDeviationsNum = Column(7) + Column(13);
