@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -37,7 +37,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, org_qvd, org_xl)
+sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, org_qvd, org_xl)
 	// Дата расчета
 	let v_cbmToday = Today(); //'31.07.2023';
 
@@ -1299,7 +1299,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		org_gosb_name as cbm_trf.GOSBName
 	resident org 
 	where Len(org_code) > 2;
-	drop table org;
+	// drop table org;
 
 	// Сливает данные по оргкоду
 	temp:
@@ -1415,6 +1415,115 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm_trf.LoadID as cbm.LoadID
 	resident cbm_trf;
 	drop table cbm_trf;
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Данные AI-трансформации
+
+	// Получает таблицу AI-трансформации
+	if '$(cbmConnection)' = '1' then
+		// QVD
+		cbm_ai:
+		noconcatenate load
+			// iicom23.DATE,
+			// iicom23.PRODUCT,
+			Sum(iicom23.COMMIS) as cbm_ai.Income,
+			// iicom23.DZO_NAME,
+			If(IsNull(org_code) or (org_code = ''), 99, org_code) as org_code
+		from [$(cbm_ai_qvd)] (qvd)
+		group by org_code;
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		// Excel
+		cbm_ai:
+		noconcatenate load
+			If((org_code = '') or (org_code = '-'), 99, org_code) as org_code,
+			// iicom23.DATE,
+			// iicom23.DZO_NAME,
+			// iicom23.PRODUCT,
+			Sum(iicom23.COMMIS) as cbm_ai.Income
+		from [$(cbm_ai_xl)] (ooxml, embedded labels, table is Sheet1)
+		group by org_code;
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	// Добавляет к таблице данные из таблицы оргкодов
+	left join (cbm_ai) load 
+		org_code,
+		org_tb_code as cbm_ai.TBCode,
+		org_gosb_code as cbm_ai.GOSBCode,
+		org_tb_name as cbm_ai.TBName,
+		org_gosb_name as cbm_ai.GOSBName,
+		If(IsNull(org_cluster), 'Без группы', org_cluster) as cbm_ai.Cluster
+ 	resident org;
+	drop table org;
+
+	// Расчитывает значение перцентилей 0,75 и 0,25
+	left join(cbm_ai) load 
+		cbm_ai.Cluster,
+		Fractile(cbm_ai.Income, 0.75) as cbm_ai.Percentile75,
+		Fractile(cbm_ai.Income, 0.25) as cbm_ai.Percentile25
+	resident cbm_ai
+	group by cbm_ai.Cluster;
+
+	// Получает значение метрики 10000024
+	temp:
+	noconcatenate load *,
+		10000050 as cbm_ai.MetricID,
+		'Низкий доход от продаж продуктов с AI-трансформацией' as cbm_ai.MetricName,
+		1 as cbm_ai.MetricDirection,
+		0 as cbm_ai.MetricPlanValue,
+		Null() as cbm_ai.ElementType, 
+		Null() as cbm_ai.ElementID,
+		'EXT_FILE' as cbm_ai.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_ai.ReportDate,
+		'STUFF' as cbm_ai.StructLevel,
+		'1) Граница боттом 25% - '&Num(cbm_ai.Percentile25, '#.0%', '.', '')&chr(13)&
+		'2) Граница топ 25% - '&Num(cbm_ai.Percentile75, '#.0%', '.', '') 
+		as cbm_ai.DevElementName,
+		cbm_ai.Income as cbm_ai.MetricValue,
+		'10000050_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_ai.LoadID,
+		'(Факт - <b>'&Num(cbm_ai.Income, '$(ggffPCD)')&
+			'</b>. Цель - больше <b>'&Num(cbm_ai.Percentile25, '$(ggffPCD)')&
+			'</b>. Ориентир - больше <b>'&Num(cbm_ai.Percentile75, '$(ggffPCD)')&'</b>)' 
+		as cbm_ai.ResultEvaluation,
+		If((cbm_ai.Income > cbm_ai.Percentile75), 
+			13, 
+			If((cbm_ai.Income <= cbm_ai.Percentile25) and ((cbm_ai.Percentile25 <> 0) or (cbm_ai.Percentile75 <> 0)),
+				1,
+				0
+			)
+		) as cbm_ai.DeviationMarker
+	resident cbm_ai;
+	drop table cbm_ai;
+	rename table temp to cbm_ai;
+
+	// Сливает данные метрики с основной таблицей
+	concatenate(cbm_data) load
+		org_code,
+		cbm_ai.TBCode as cbm.TBCode,
+		cbm_ai.GOSBCode as cbm.GOSBCode,
+		cbm_ai.TBName as cbm.TBName,
+		cbm_ai.GOSBName as cbm.GOSBName,
+		cbm_ai.MetricID as cbm.MetricID,
+		cbm_ai.MetricName as cbm.MetricName,
+		cbm_ai.MetricDirection as cbm.MetricDirection,
+		cbm_ai.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_ai.ElementType as cbm.ElementType, 
+		cbm_ai.ElementID as cbm.ElementID,
+		cbm_ai.Segment as cbm.Segment,
+		cbm_ai.ReportDate as cbm.ReportDate,
+		cbm_ai.StructLevel as cbm.StructLevel,
+		cbm_ai.DevElementName as cbm.DevElementName,
+		cbm_ai.MetricValue as cbm.MetricValue,
+		cbm_ai.ResultEvaluation as cbm.ResultEvaluation,
+		cbm_ai.DeviationMarker as cbm.DeviationMarker,
+		cbm_ai.LoadID as cbm.LoadID
+	resident cbm_ai;
+	drop table cbm_ai;
 
 	////////////////////////////////////////////////////////////////////////////////
 
