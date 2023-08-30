@@ -238,9 +238,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
+					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
+					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
+					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта')
+				) and
 				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or 
-					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
+					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')
+				) and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
@@ -297,7 +302,11 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП, реализуемых в текущем году: ' &
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
+					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
+					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
+					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта')
+				) and
 				(cbm.Direction = 'КРП') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -525,8 +534,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		// Имя элемента
 		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
-			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП')) and 
-					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
+			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП') or
+						(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')
+					) and 
+					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена') or 
+						(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
+						(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
+						(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта')
+					) and 
 					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
 				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status
 			),
@@ -540,11 +555,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
 				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
 			//10000018
-			If((cbm.Direction = 'КРП') and ((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
+			If(((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and 
+					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
 					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
 				cbm.Direction & ': '& cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
 			//10000019
-			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП')) and 
+			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП') or 
+						(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')
+					) and 
 					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
 					(cbm.YearReport = '2023') and (cbm.ControlDate > Date('02.02.2024')) and (cbm.ControlDate < Date('02.02.2025')),
 				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status)
