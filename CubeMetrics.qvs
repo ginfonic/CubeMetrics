@@ -1431,7 +1431,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			org_code
 			// If(IsNull(org_code) or (org_code = ''), 99, org_code) as org_code
 		from [$(cbm_ai_qvd)] (qvd)
-		where not(IsNull(org_code)) and (org_code <> '')
+		// Без ЦА и Москвы
+		where not(IsNull(org_code)) and (org_code <> '') and (org_code <> 3838)
 		group by org_code;
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
@@ -1447,12 +1448,25 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// iicom23.PRODUCT,
 			Sum(iicom23.COMMIS) as cbm_ai.Income
 		from [$(cbm_ai_xl)] (ooxml, embedded labels, table is Sheet1)
-		where (org_code <> '') and (org_code <> '-')
+		// Без ЦА и Москвы
+		where (org_code <> '') and (org_code <> '-') and (org_code <> 3838)
 		group by org_code;
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
+
+	// Добавляет в таблицу матрицу оргкодов всех ГОСБ
+	concatenate (cbm_ai) load org_code resident org where not(IsNull(org_gosb_code));
+	// Сливает таблицу по org_code, оставляя нули у отсутствующих в данных ГОСБ
+	temp:
+	noconcatenate load 
+		org_code,
+		Sum(cbm_ai.Income) as cbm_ai.Income
+	resident cbm_ai
+	group by org_code;
+	drop table cbm_ai;
+	rename table temp to cbm_ai;
 
 	// Добавляет к таблице данные из таблицы оргкодов
 	left join (cbm_ai) load 
@@ -1473,7 +1487,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	resident cbm_ai
 	group by cbm_ai.Cluster;
 
-	// Получает значение метрики 10000024
+	// Получает значение метрики 10000050
 	temp:
 	noconcatenate load *,
 		10000050 as cbm_ai.MetricID,
