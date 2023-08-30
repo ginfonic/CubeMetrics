@@ -1428,8 +1428,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// iicom23.PRODUCT,
 			Sum(iicom23.COMMIS) as cbm_ai.Income,
 			// iicom23.DZO_NAME,
-			If(IsNull(org_code) or (org_code = ''), 99, org_code) as org_code
+			org_code
+			// If(IsNull(org_code) or (org_code = ''), 99, org_code) as org_code
 		from [$(cbm_ai_qvd)] (qvd)
+		where not(IsNull(org_code)) and (org_code <> '')
 		group by org_code;
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
@@ -1438,12 +1440,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		// Excel
 		cbm_ai:
 		noconcatenate load
-			If((org_code = '') or (org_code = '-'), 99, org_code) as org_code,
+			// If((org_code = '') or (org_code = '-'), 99, org_code) as org_code,
+			org_code,
 			// iicom23.DATE,
 			// iicom23.DZO_NAME,
 			// iicom23.PRODUCT,
 			Sum(iicom23.COMMIS) as cbm_ai.Income
 		from [$(cbm_ai_xl)] (ooxml, embedded labels, table is Sheet1)
+		where (org_code <> '') and (org_code <> '-')
 		group by org_code;
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
@@ -1481,14 +1485,14 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_ai.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_ai.ReportDate,
 		'STUFF' as cbm_ai.StructLevel,
-		'1) Граница боттом 25% - '&Num(cbm_ai.Percentile25, '#.0%', '.', '')&chr(13)&
-		'2) Граница топ 25% - '&Num(cbm_ai.Percentile75, '#.0%', '.', '') 
+		'1) Граница боттом 25% - '&cbm_ai.Percentile25&' руб. '&chr(13)&
+		'2) Граница топ 25% - '&cbm_ai.Percentile75&' руб. ' 
 		as cbm_ai.DevElementName,
 		cbm_ai.Income as cbm_ai.MetricValue,
 		'10000050_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_ai.LoadID,
-		'(Факт - <b>'&Num(cbm_ai.Income, '$(ggffPCD)')&
-			'</b>. Цель - больше <b>'&Num(cbm_ai.Percentile25, '$(ggffPCD)')&
-			'</b>. Ориентир - больше <b>'&Num(cbm_ai.Percentile75, '$(ggffPCD)')&'</b>)' 
+		'(Факт - <b>'&Num(cbm_ai.Income / 1000, '$(ggffNUH)')&
+			' тыс. руб.</b>. Цель - больше <b>'&Num(cbm_ai.Percentile25 / 1000, '$(ggffNUH)')&
+			' тыс. руб.</b>. Ориентир - больше <b>'&Num(cbm_ai.Percentile75 / 1000, '$(ggffNUH)')&' тыс. руб.</b>)' 
 		as cbm_ai.ResultEvaluation,
 		If((cbm_ai.Income > cbm_ai.Percentile75), 
 			13, 
