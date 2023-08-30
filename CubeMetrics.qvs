@@ -817,9 +817,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		not(IsNull($3)) and ($3 <> '') and ($3 <> '-');
 
 	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года относительно текущего квартала: $1 - год, $2 - квартал
-	set sbmIsPastQuarterOnlyThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 < $(ggffQuarterNo('$(v_cbmToday)'))));
+	set cbmIsPastQuarterOnlyThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 < $(ggffQuarterNo('$(v_cbmToday)'))));
 	//Проверяет квартал и год записи, текущий или будущие ли это кварталы текущего года относительно текущего: $1 - год, $2 - квартал
-	set sbmIsThisAndFutureQuarterThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 >= $(ggffQuarterNo('$(v_cbmToday)'))));
+	set cbmIsThisAndFutureQuarterThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 >= $(ggffQuarterNo('$(v_cbmToday)'))));
 	//Проверяет квартал и год записи, прошлые ли это кварталы текущего года относительно текущего квартала
 	//(весь прошлый год, если первый квартал): $1 - год, $2 - квартал
 	set cbmIsPastQuarterThisAndPrevYear = 
@@ -844,11 +844,27 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	// Проверяет год записи, текущий ли это год: 1 - год
 	set cbmIsThisYear = ($1 = Year('$(v_cbmToday)'));
 	// Проверяет квартал записи, четвертый ли он текущего года: $1 - год, $2 - квартал
-	set sbmIs4QThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 = 4));
+	set cbmIs4QThisYear = (($1 = Year('$(v_cbmToday)')) and ($2 = 4));
 	// Проверяет, не ГЧП ли продукт: $1 - продукт
 	set cbmIsNotGChP = (Left($1, 3) <> 'ГЧП');
 	// Проверяет статус реализации
 	set cbmIsRealised = (($1 = 134) or ($1 = 777));
+	// Начало года
+	set cbmYearStart = Date(YearStart('$(v_cbmToday)'));
+	// Конец предыдущего квартала
+	set cbmPrevQuarterEnd = Date(QuarterEnd(AddMonths('$(v_cbmToday)', -3)));
+	// Даты от начала гола до конца предыдущего квартала
+	set cbmPastQuarterOnlyThisYearDates = //$(cbmYearStart)&'-'&$(cbmPrevQuarterEnd);
+		If($(cbmYearStart) < $(cbmPrevQuarterEnd),
+			$(cbmYearStart)&'-'&$(cbmPrevQuarterEnd),
+			'неприменимо'
+		);
+	// Начало текущего квартала
+	set cbmThisQuarterStart = Date(QuarterStart('$(v_cbmToday)'));
+	// Конец года
+	set cbmYearEnd = Date(YearEnd('$(v_cbmToday)'));
+	// Даты от начала текущего квартала до конца года
+	set cbmThisAndFutureQuarterThisYearDates = $(cbmThisQuarterStart)&'-'&$(cbmYearEnd);
 
 	//Получает данные
 	if '$(cbmConnection)' = '1' then
@@ -871,10 +887,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// chain,
 			// object,
 			// id_basket_item,
-			If($(sbmIsPastQuarterOnlyThisYear("year", quarter)), "fact", 0) as cbm_fbs.FactPastQuarters,
-			If($(sbmIsThisAndFutureQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanThisAndFutureQuarters,
+			If($(cbmIsPastQuarterOnlyThisYear("year", quarter)), "fact", 0) as cbm_fbs.FactPastQuarters,
+			If($(cbmIsThisAndFutureQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanThisAndFutureQuarters,
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
-			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
+			If($(cbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
 			If($(cbmIsPastQuarterThisAndPrevYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact,
 			If($(cbmIsPastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact,
 			If($(cbmIsPrevPastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.PrevFact
@@ -917,10 +933,10 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			// chain,
 			// object,
 			// id_basket_item,
-			If($(sbmIsPastQuarterOnlyThisYear("year", quarter)), "fact", 0) as cbm_fbs.FactPastQuarters,
-			If($(sbmIsThisAndFutureQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanThisAndFutureQuarters,
+			If($(cbmIsPastQuarterOnlyThisYear("year", quarter)), "fact", 0) as cbm_fbs.FactPastQuarters,
+			If($(cbmIsThisAndFutureQuarterThisYear("year", quarter)), plan, 0) as cbm_fbs.PlanThisAndFutureQuarters,
 			If($(cbmIsThisYear("year")), plan, 0) as cbm_fbs.PlanThisYear,
-			If($(sbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
+			If($(cbmIs4QThisYear("year", quarter)), plan, 0) as cbm_fbs.Plan4QThisYear,
 			If($(cbmIsPastQuarterThisAndPrevYear("year", quarter)) and $(cbmIsNotGChP(product)), income, 0) as cbm_fbs.IncomeFact,
 			If($(cbmIsPastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.Fact,
 			If($(cbmIsPrevPastQuarterEver("year", quarter)) and $(cbmIsRealised(status)), "fact", 0) as cbm_fbs.PrevFact
@@ -1020,8 +1036,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_fbs.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_fbs.ReportDate,
 		'STUFF' as cbm_fbs.StructLevel,
-		'1) Факт продаж продуктов полки - '&cbm_fbs.FactPastQuarters&' шт. '&chr(13)&
-		'2) PL продаж продуктов полки - '&cbm_fbs.PlanThisAndFutureQuarters&' шт. '&chr(13)&
+		'1) Факт продаж продуктов полки ('&$(cbmPastQuarterOnlyThisYearDates)&') - '&cbm_fbs.FactPastQuarters&' шт. '&chr(13)&
+		'2) PL продаж продуктов полки ('&$(cbmThisAndFutureQuarterThisYearDates)&') - '&cbm_fbs.PlanThisAndFutureQuarters&' шт. '&chr(13)&
 		'3) Ориентир продаж - '&cbm_fbs.Milestone&' шт.'
 		as cbm_fbs.DevElementName,
 		If((cbm_fbs.Milestone > 0), 
@@ -1040,7 +1056,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	resident cbm_fbs_10000021
 	where (cbm_fbs.MetricValue >= cbm_fbs.MetricPlanValue);
 
-	// Добавляет поле DeviationMarker
+	// Добавляет поля ResultEvaluation и DeviationMarker
 	temp:
 	noconcatenate load *,
 		'(Факт - <b>'&Num(cbm_fbs.MetricValue, '$(ggffPCT)')&
