@@ -1743,8 +1743,7 @@ sub cbmSetVariables
 	set cbmGetProductsDeviationsTitle = 'Отклонений по полке';
 	set cbmGetGOSBProductsDeviationsNum = Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName);
 	set cbmGetTBProductsDeviationsNum = Sum(Aggr(Count({<cbm.Category = {'Полка'}, cbm.DeviationMarker = {1}>} distinct cbm.MetricName), org_gosb_code));
-	set cbmGetProductsDeviationsNum = 
-		 ^(cbmGetGOSBProductsDeviationsNum), ^(cbmGetTBProductsDeviationsNum));
+	set cbmGetProductsDeviationsNum = If(Dimensionality() <> 0, ^(cbmGetGOSBProductsDeviationsNum), ^(cbmGetTBProductsDeviationsNum));
 	let cbmGetProductsDeviationsNum = Replace(cbmGetProductsDeviationsNum, '^','$');
 	// Ранг отклонений по полке
 	set cbmGetGOSBProductsDeviationsRank = Rank(Aggr(^(cbmGetGOSBProductsDeviationsNum), org_gosb_code), 1, 1);
