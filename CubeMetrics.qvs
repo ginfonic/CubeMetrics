@@ -1673,22 +1673,38 @@ sub cbmSetVariables
 	for mi = 15 to 35
 		// В таблицу
 		set cbmGet$(mi)MetricTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricShortName);
-		set cbmGet$(mi)DeviationMarker = 
+		set cbmGet$(mi)Value = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricValue);
+		set cbmGet$(mi)MetricValue =
 			If(Dimensionality() = 0,
 				Sum(Aggr(If(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker) = 1, 1, 0), org_gosb_code)), 
-				Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker)
+				Pick(Match($(mi), 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 35) + 1, 
+					$(ggffDash), 
+					Num(^(cbmGet$(mi)Value), '$(ggffPCT)'),
+					Num(^(cbmGet$(mi)Value), '$(ggffNUM)')&' шт.',
+					Num(^(cbmGet$(mi)Value), '$(ggffPCT)'),
+					Num(^(cbmGet$(mi)Value), '$(ggffPCT)'),
+					Num(^(cbmGet$(mi)Value), '$(ggffPCT)'),
+					Num(^(cbmGet$(mi)Value), '$(ggffPCT)'),
+					Num(^(cbmGet$(mi)Value), '$(ggffPCD)'),
+					Num(^(cbmGet$(mi)Value) / 1000000, '$(ggffNUH)')&' млн р',
+					Num(^(cbmGet$(mi)Value), '$(ggffPCD)'),
+					Num(^(cbmGet$(mi)Value), '$(ggffPCD)'),
+					Interval(^(cbmGet$(mi)Value)/(3600*24),'h:mm:ss')
+				)
 			);
-		set cbmGet$(mi)DeviationMarkerColor = 
+		let cbmGet$(mi)MetricValue = Replace(cbmGet$(mi)MetricValue, '^','$');
+		set cbmGet$(mi)MetricValueColor = 
 			If(Dimensionality() <> 0,
 				Pick(
 					Match(Only({<cbm.MetricID = {100000$(mi)}>} cbm.DeviationMarker), 1, 0, 13) + 1,
 						'$(ggffGrey)', '$(ggffRed)', '$(ggffGreen)', '$(ggffBlue)'
 				)
 			);
+		set cbmGet$(mi)MetricValueTextColor = 0;
 		// В подвал
 		set cbmGet$(mi)MetricFullTitle = Only({<cbm.MetricID = {100000$(mi)}>} cbm.MetricName);
-		set cbmGet$(mi)MetricValue = Only({<^(cbmCurOrgCode), cbm.MetricID = {100000$(mi)}>} cbm.ResultEvaluation);
-		let cbmGet$(mi)MetricValue = Replace(cbmGet$(mi)MetricValue, '^','$');
+		set cbmGet$(mi)MetricFullValue = Only({<^(cbmCurOrgCode), cbm.MetricID = {100000$(mi)}>} cbm.ResultEvaluation);
+		let cbmGet$(mi)MetricFullValue = Replace(cbmGet$(mi)MetricFullValue, '^','$');
 		set cbmGet$(mi)DevElementName = 
 			Only({<^(cbmCurOrgCode), cbm.StructLevel = {'STUFF'}, cbm.MetricID = {100000$(mi)}>} cbm.DevElementName);
 		let cbmGet$(mi)DevElementName = Replace(cbmGet$(mi)DevElementName, '^','$');
@@ -1711,20 +1727,20 @@ sub cbmSetVariables
 	// Список комментариев
 	set cbmGetProjectComments = 
 		'<p style="font-size: 20px; font-weight: 800; ">Проекты</p>'&
-		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b> '&^(cbmGet15MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet15DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b> '&^(cbmGet16MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet16DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b> '&^(cbmGet17MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet17DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet18MetricFullTitle)&'</b> '&^(cbmGet18MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet18DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet19MetricFullTitle)&'</b> '&^(cbmGet19MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet19DevElementName)&'</p>';
+		'<p><b>'&^(cbmGet15MetricFullTitle)&'</b> '&^(cbmGet15MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet15DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet16MetricFullTitle)&'</b> '&^(cbmGet16MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet16DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet17MetricFullTitle)&'</b> '&^(cbmGet17MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet17DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet18MetricFullTitle)&'</b> '&^(cbmGet18MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet18DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet19MetricFullTitle)&'</b> '&^(cbmGet19MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet19DevElementName)&'</p>';
 	let cbmGetProjectComments = Replace(cbmGetProjectComments, '^','$');
 	// Список комментариев
 	set cbmGetProductComments = 
 		'<p style="font-size: 20px; font-weight: 800; ">Полка</p>'&
-		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b> '&^(cbmGet21MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet21DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b> '&^(cbmGet22MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet22DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b> '&^(cbmGet23MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet23DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet24MetricFullTitle)&'</b> '&^(cbmGet24MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet24DevElementName)&'</p>'&
-		'<p><b>'&^(cbmGet25MetricFullTitle)&'</b> '&^(cbmGet25MetricValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet25DevElementName)&'</p>';
+		'<p><b>'&^(cbmGet21MetricFullTitle)&'</b> '&^(cbmGet21MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet21DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet22MetricFullTitle)&'</b> '&^(cbmGet22MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet22DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet23MetricFullTitle)&'</b> '&^(cbmGet23MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet23DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet24MetricFullTitle)&'</b> '&^(cbmGet24MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet24DevElementName)&'</p>'&
+		'<p><b>'&^(cbmGet25MetricFullTitle)&'</b> '&^(cbmGet25MetricFullValue)&'</p><p style="margin-left: 20px; ">'&^(cbmGet25DevElementName)&'</p>';
 	let cbmGetProductComments = Replace(cbmGetProductComments, '^','$');
 	// Количество отклонений по проектам
 	set cbmGetProjectsDeviationsTitle = 'Отклонений по проектам';
