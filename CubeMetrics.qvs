@@ -1248,11 +1248,11 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm_fbs.PenetrationGrowth as cbm_fbs.MetricValue,
 		'10000025_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_fbs.LoadID,
 		'(Доля - <b>'&Num(cbm_fbs.Penetration, '$(ggffPCD)')&
-			'</b>. Прирост доли <b>'&Num(cbm_fbs.PenetrationGrowth * 100, '$(ggffPPT)')&
+			'</b>. Прирост доли за кв. <b>'&Num(cbm_fbs.PenetrationGrowth * 100, '$(ggffPPT)')&
 			'</b>. Цель - доля больше <b>'&Num(cbm_fbs.PenetrationPercentile50, '$(ggffPCD)')&
-			'</b> или прирост доли больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&
+			'</b> или прирост доли за кв. больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&
 			'</b>. Ориентир - доля больше <b>'&Num(cbm_fbs.PenetrationPercentile50, '$(ggffPCD)')&
-			'</b> и прирост доли больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&'</b>)'
+			'</b> и прирост доли за кв. больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&'</b>)'
 		as cbm_fbs.ResultEvaluation,
 		If((cbm_fbs.Penetration > cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth > cbm_fbs.PenetrationGrowthPercentile50), 
 			13, 
