@@ -738,7 +738,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 
 	// Считает число продуктов
 	product_lookup_count:
-	// Из числа продуктов вычитаем два из-за двух сдвоенных продуктов (ДМП/ДДН и ГЧП Тур/ГЧП Спорт)
+	// Из числа продуктов вычитает два из-за двух сдвоенных продуктов (ДМП/ДДН и ГЧП Туризм/Спорт)
 	noconcatenate load (Count(product_id) - 2) as product_count resident product_lookup;
 	join(product_lookup) load product_count resident product_lookup_count;
 	drop table product_lookup_count;
