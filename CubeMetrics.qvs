@@ -711,6 +711,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	noconcatenate load * inline [
 		product_id
 		25
+		26
 		101
 		115
 		162
@@ -722,6 +723,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		176
 		185
 		220
+		223
 		226
 		227
 		228
@@ -736,7 +738,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 
 	// Считает число продуктов
 	product_lookup_count:
-	noconcatenate load Count(product_id) as product_count resident product_lookup;
+	// Из числа продуктов вычитаем два из-за двух сдвоенных продуктов (ДМП/ДДН и ГЧП Тур/ГЧП Спорт)
+	noconcatenate load (Count(product_id) - 2) as product_count resident product_lookup;
 	join(product_lookup) load product_count resident product_lookup_count;
 	drop table product_lookup_count;
 
