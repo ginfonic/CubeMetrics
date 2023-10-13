@@ -241,7 +241,8 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
 					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
 					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
-					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта')
+					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or 
+					(cbm.Status = 'Согласование ЗНИ') 
 				) and
 				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or 
 					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')
@@ -253,7 +254,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			$(cbmGetClusterMilestone),
 			//10000016
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'Бизнес идеи (КРП)') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024') and 
@@ -271,7 +272,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			$(cbmGetClusterMilestone),
 			//10000018
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
+					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
+				) and
 				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -280,7 +283,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			$(cbmGetClusterMilestone),
 			//10000019
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or
+					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
+				) and
 				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or 
 					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
 				(cbm.YearReport = 2023) and
@@ -294,18 +299,19 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000015
 			'1)	Количество идей КРП на текущий год: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'Бизнес идеи (КРП)') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'2)	Количество КРП, реализуемых в текущем году: ' &
+			'2)	Количество КРП и PL КРП, реализуемых в текущем году: ' &
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
 					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
 					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
-					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта')
+					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or 
+					(cbm.Status = 'Согласование ЗНИ')
 				) and
 				(cbm.Direction = 'КРП') and
 				(cbm.YearReport = 2023) and
@@ -314,7 +320,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
+					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
+				) and
 				(cbm.Direction = 'Бизнес-эксперименты') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -322,7 +330,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'4)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
+					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
+				) and
 				(cbm.Direction = 'ИИ-трансформация') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -336,7 +346,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			//10000018
 			'1)	Количество КРП, реализуемых в текущем году: ' &
 			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status ='Согласование ЗНИ')) and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'КРП') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -352,7 +362,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
 			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status ='Согласование ЗНИ')) and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'Бизнес-эксперименты') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -368,7 +378,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'5)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
 			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status ='Согласование ЗНИ')) and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'ИИ-трансформация') and
 				(cbm.YearReport = 2023) and
 				(cbm.ControlDate < '02.02.2024'),
@@ -394,7 +404,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП, реализуемых в следующем году: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'КРП') and
 				(cbm.YearReport = 2023) and
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
@@ -402,7 +412,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'3)	Количество бизнес-экспериментов, реализуемых в следующем году: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'Бизнес-эксперименты') and
 				(cbm.YearReport = 2023) and
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
@@ -410,7 +420,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 			)) & ' шт. '& chr(13) &
 			'4)	Количество ИИ-трансформаций, реализуемых в следующем году: ' &
 			Count(If(
-				(cbm.Status = 'В работе') and
+				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'ИИ-трансформация') and
 				(cbm.YearReport = 2023) and
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
@@ -1534,7 +1544,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 				0
 			)
 		) as cbm_ai.DeviationMarker
-	resident cbm_ai;
+	resident cbm_ai
+	// Убирает из данных строки Абаканского, Адыгейского и Кызылского ГОСБ
+	where (org_code <> 448602) and (org_code <> 528620) and (org_code <> 448591);
 	drop table cbm_ai;
 	rename table temp to cbm_ai;
 
