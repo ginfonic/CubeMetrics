@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -37,7 +37,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, org_qvd, org_xl)
+sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, org_qvd, org_xl)
 	// Дата расчета
 	let v_cbmToday = Today(); //'31.07.2023';
 
@@ -1575,7 +1575,141 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	drop table cbm_ai;
 
 	////////////////////////////////////////////////////////////////////////////////
+	// Данные долей
 
+	//Получает данные долей
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_grm:
+		noconcatenate load
+			If(org_code = 38, 3838, org_code) as org_code,
+			Num#(kpi_id) as cbm_grm.IndexID,
+			Date(Floor(MonthEnd(kpi_report_date))) as cbm_grm.Date,
+			kpi_amt_sber as cbm_grm.SBRValue,
+			kpi_amt_market as cbm_grm.MKTValue
+		from [$(grm_data_qvd)] (QVD)
+		where (kpi_id = '2141076') or (kpi_id = '1001115') or (kpi_id = '2081079') or (kpi_id = '2091156') or (kpi_id = '10003300') or
+			 (kpi_id = '10901388') or (kpi_id = '10902922') or (kpi_id = '10901073') or (kpi_id = '10902917') or (kpi_id = '10902915');
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		cbm_grm:
+		noconcatenate load
+			If(org_code = 38, 3838, org_code) as org_code,
+			Num#(kpi_id) as cbm_grm.IndexID,
+			Date(Floor(MonthEnd(kpi_report_date))) as cbm_grm.Date,
+			kpi_amt_sber as cbm_grm.SBRValue,
+			kpi_amt_market as cbm_grm.MKTValue
+		from [$(grm_data_xl)]
+		(ooxml, embedded labels, table is Sheet1)
+		where (kpi_id = '2141076') or (kpi_id = '1001115') or (kpi_id = '2081079') or (kpi_id = '2091156') or (kpi_id = '10003300') or
+			 (kpi_id = '10901388') or (kpi_id = '10902922') or (kpi_id = '10901073') or (kpi_id = '10902917') or (kpi_id = '10902915');
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	//Сливает записи по оргкоду, показателю и дате
+	temp:
+	noconcatenate load 
+		org_code, 
+		cbm_grm.IndexID, 
+		cbm_grm.Date, 
+		Sum(cbm_grm.SBRValue) as cbm_grm.SBRValue, 
+		Sum(cbm_grm.MKTValue) as cbm_grm.MKTValue
+	resident cbm_grm
+	group by org_code, cbm_grm.IndexID, cbm_grm.Date;
+	drop table cbm_grm;
+	rename table temp to cbm_grm;
+
+	//Таблица подстановки имени и типа сравнения по показателям
+	compare_type_lookup:
+	noconcatenate load * inline [
+		id, name, delta_type
+		2141076, ФОТ, АППГ
+		1001115, Пенсии, АППГ
+		2081079, ЖКХ, АППГ
+		2091156, Эквайринг, АППГ
+		10003300, NoCash, АППГ
+		10901388, eCom, АППГ
+		10902922, КР ЮЛ (ЦБ), СНГ
+		10901073, ПС ЮЛ (ЦБ), СНГ
+		10902917, ЖК ФЛ, СНГ
+		10902915, ПС ФЛ, СНГ
+	];
+
+	//Добавляет данные по показателям из таблицы подстановки
+	left join (cbm_grm) load
+		id as cbm_grm.IndexID,
+		name as cbm_grm.Index,
+		delta_type as cbm_grm.CompareType
+	resident compare_type_lookup;
+	drop table compare_type_lookup;
+
+	//Находит последнюю дату по показателю и ГОСБ
+	left join (cbm_grm) load
+		cbm_grm.IndexID,
+		org_code,
+		Date(Floor(Max(cbm_grm.Date))) as cbm_grm.LastDate
+	resident cbm_grm
+	group by cbm_grm.IndexID, org_code;
+
+	//Находит предыдущую даты для сравнения с последней
+	left join (cbm_grm) load
+		org_code,
+		cbm_grm.IndexID,
+		cbm_grm.Date,
+		//Предыдущая дата
+		If(cbm_grm.CompareType = 'АППГ',
+			//Год назад
+			Date(Floor(AddYears(cbm_grm.LastDate, -1))),
+			//Конец прошлого года
+			Date(Floor(YearEnd(AddYears(cbm_grm.LastDate, -1))))
+		) as cbm_grm.PrevDate
+	resident cbm_grm;
+	
+	//Находит данные за предыдущую дату
+	left join (cbm_grm) load
+		org_code,
+		cbm_grm.IndexID,
+		cbm_grm.Date as cbm_grm.PrevDate,
+		cbm_grm.SBRValue as cbm_grm.PrevSBRValue,
+		cbm_grm.MKTValue as cbm_grm.PrevMKTValue
+	resident cbm_grm;
+
+	temp:
+	noconcatenate load *,
+		//Рост доли Сбера
+		cbm_grm.SBRShare - cbm_grm.PrevSBRShare as cbm_grm.SBRShareGrowth;
+	noconcatenate load *,
+		//Текущая доля Сбера
+		If(IsNull(cbm_grm.SBRValue) or IsNull(cbm_grm.MKTValue) or (cbm_grm.MKTValue = 0), 
+			0, 
+			cbm_grm.SBRValue / cbm_grm.MKTValue
+		) as cbm_grm.SBRShare,
+		//Предыдущая доля Сбера
+		If(IsNull(cbm_grm.PrevSBRValue) or IsNull(cbm_grm.PrevMKTValue) or (cbm_grm.PrevMKTValue = 0), 
+			0, 
+			cbm_grm.PrevSBRValue / cbm_grm.PrevMKTValue
+		) as cbm_grm.PrevSBRShare
+	resident cbm_grm
+	//Оставляет только последнюю дату
+	where (cbm_grm.Date = cbm_grm.LastDate);
+	drop table cbm_grm;
+	rename table temp to cbm_grm;
+	drop field cbm_grm.LastDate, cbm_grm.PrevDate;
+	drop field cbm_grm.SBRValue, cbm_grm.PrevSBRValue, cbm_grm.SBRShare, cbm_grm.PrevSBRShare;
+	drop field cbm_grm.MKTValue, cbm_grm.PrevMKTValue;
+
+	// Считает чмсло показателей с отрицательным ростом доли
+	left join(cbm_grm) load
+		org_code,
+		Count(If(cbm_grm.SBRShareGrowth < 0, cbm_grm.IndexID)) as cbm_grm.NegativeGrowthCount
+	resident cbm_grm
+	group by org_code;
+
+	////////////////////////////////////////////////////////////////////////////////
 	// Финальный шаблон метрик
 	cbm_metrics_final_lookup:
 	noconcatenate load * inline [
@@ -1592,6 +1726,9 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		10000024, Низкая доля продаж, Полка
 		10000025, Низкий прир. доли продаж, Полка
 		10000035, Посещ. платф. ПРБР, Прочее
+		10000050, Низ. дох. от AI, Прочее
+		10000062, Прогноз невып. БП, Прочее
+		10000001, Сниж. долей рынков, Прочее
   ];
 
 	// Добавляет финальный шаблон к таблице
