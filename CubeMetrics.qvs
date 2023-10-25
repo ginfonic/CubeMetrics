@@ -1752,19 +1752,19 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_grm.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_grm.ReportDate,
 		'STUFF' as cbm_grm.StructLevel,
-		'1) Граница боттом 25% - '&cbm_grm.Percentile25&' '&chr(13)&
-			'2) Граница топ 25% - '&cbm_grm.Percentile75&' '&chr(13)&
+		'1) Граница боттом 25% - '&cbm_grm.Percentile75&' '&chr(13)&
+			'2) Граница топ 25% - '&cbm_grm.Percentile25&' '&chr(13)&
 			cbm_grm.FallingSharesList 
 		as cbm_grm.DevElementName,
 		cbm_grm.NegativeGrowthCount as cbm_grm.MetricValue,
 		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_grm.LoadID,
 		'(Факт - <b>'&cbm_grm.NegativeGrowthCount&
-			'</b>. Цель - меньше <b>'&cbm_grm.Percentile75&
-			'</b>. Ориентир - меньше <b>'&cbm_grm.Percentile25&'</b>)' 
+			'</b>. Цель - меньше <b>'&cbm_grm.Percentile25&
+			'</b>. Ориентир - меньше <b>'&cbm_grm.Percentile75&'</b>)' 
 		as cbm_grm.ResultEvaluation,
-		If((cbm_grm.NegativeGrowthCount >= cbm_grm.Percentile75) and ((cbm_grm.Percentile25 <> 0) or (cbm_grm.Percentile75 <> 0)), 
+		If((cbm_grm.NegativeGrowthCount > cbm_grm.Percentile75) and ((cbm_grm.Percentile25 <> 0) or (cbm_grm.Percentile75 <> 0)), 
 			1, 
-			If((cbm_grm.NegativeGrowthCount < cbm_grm.Percentile25),
+			If((cbm_grm.NegativeGrowthCount <= cbm_grm.Percentile25),
 				13,
 				0
 			)
@@ -1888,19 +1888,19 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		'EXT_FILE' as cbm_bp.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_bp.ReportDate,
 		'STUFF' as cbm_bp.StructLevel,
-		'1) Граница боттом 25% - '&cbm_bp.Percentile25&' '&chr(13)&
-			'2) Граница топ 25% - '&cbm_bp.Percentile75&' '&chr(13)&
+		'1) Граница боттом 25% - '&cbm_bp.Percentile75&' '&chr(13)&
+			'2) Граница топ 25% - '&cbm_bp.Percentile25&' '&chr(13)&
 			cbm_bp.Alert 
 		as cbm_bp.DevElementName,
 		cbm_bp.Deviations as cbm_bp.MetricValue,
 		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_bp.LoadID,
 		'(Факт - <b>'&cbm_bp.Deviations&
-			'</b>. Цель - меньше <b>'&cbm_bp.Percentile75&
-			'</b>. Ориентир - меньше <b>'&cbm_bp.Percentile25&'</b>)' 
+			'</b>. Цель - меньше <b>'&cbm_bp.Percentile25&
+			'</b>. Ориентир - меньше <b>'&cbm_bp.Percentile75&'</b>)' 
 		as cbm_bp.ResultEvaluation,
-		If((cbm_bp.Deviations >= cbm_bp.Percentile75) and ((cbm_bp.Percentile25 <> 0) or (cbm_bp.Percentile75 <> 0)), 
+		If((cbm_bp.Deviations > cbm_bp.Percentile75) and ((cbm_bp.Percentile25 <> 0) or (cbm_bp.Percentile75 <> 0)), 
 			1, 
-			If((cbm_bp.Deviations < cbm_bp.Percentile25),
+			If((cbm_bp.Deviations <= cbm_bp.Percentile25),
 				13,
 				0
 			)
