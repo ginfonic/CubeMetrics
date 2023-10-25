@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -37,7 +37,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, org_qvd, org_xl)
+sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, cbm_bp_qvd, cbm_bp_xl, org_qvd, org_xl)
 	// Дата расчета
 	let v_cbmToday = Today(); //'31.07.2023';
 
@@ -1714,13 +1714,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	resident cbm_grm
 	group by org_code;
 
-	// Удаляет ненужные поля
-	drop field cbm_grm.LastDate, cbm_grm.PrevDate, cbm_grm.Date;
-	drop field cbm_grm.CompareType, cbm_grm.IndexID, cbm_grm.Index;
-	drop field cbm_grm.SBRValue, cbm_grm.PrevSBRValue, cbm_grm.SBRShare, cbm_grm.PrevSBRShare;
-	drop field cbm_grm.SBRShareGrowth, cbm_grm.MKTValue, cbm_grm.PrevMKTValue;
-
-	// Сливает таблицу по оргкоду и дате
+	// Сливает таблицу по оргкоду, оставляя только нужные аггрегаты
 	temp:
 	noconcatenate load 
 		org_code,
@@ -1739,7 +1733,6 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		org_tb_name as cbm_grm.TBName,
 		org_gosb_name as cbm_grm.GOSBName
  	resident org;
-	drop table org;
 
 	// Расчитывает значение перцентилей 0,75 и 0,25
 	left join(cbm_grm) load 
@@ -1803,6 +1796,142 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm_grm.LoadID as cbm.LoadID
 	resident cbm_grm;
 	drop table cbm_grm;
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Данные бизнес-плана
+
+	//Получает данные бизнес-плана
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_bp:
+		noconcatenate load
+			alert_text as cbm_bp.Alert,
+			// "color",
+			// gosb,
+			// kluster,
+			// max_rank,
+			// metric,
+			// metric_value,
+			org_code,
+			// otchetnaya_data,
+			// rank,
+			// rank_color,
+			Num#(rank_value) as cbm_bp.Deviations,
+			Date(report_date) as cbm_bp.Date
+		from [$(cbm_bp_qvd)] (QVD)
+		where (metric = 'КП БП') and (Len(org_code) > 2) and (org_code <> 529052) and (org_code <> 161790);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		cbm_bp:
+		noconcatenate load
+			alert_text as cbm_bp.Alert,
+			// "color",
+			// gosb,
+			// kluster,
+			// max_rank,
+			// metric,
+			// metric_value,
+			org_code,
+			// otchetnaya_data,
+			// rank,
+			// rank_color,
+			Num#(rank_value) as cbm_bp.Deviations,
+			Date(report_date) as cbm_bp.Date
+		from [$(cbm_bp_xl)] (ooxml, embedded labels, table is Sheet1)
+		where (metric = 'КП БП') and (Len(org_code) > 2) and (org_code <> 529052) and (org_code <> 161790);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	// Находит последнюю дату
+	left join(cbm_bp) load
+		org_code,
+		Max(cbm_bp.Date) as cbm_bp.LastDate
+	resident cbm_bp
+	group by org_code;
+
+	// Оставляет только записи за последнюю дату
+	temp:
+	noconcatenate load * resident cbm_bp where cbm_bp.Date = cbm_bp.LastDate;
+	drop table cbm_bp;
+	rename table temp to cbm_bp;
+	drop field cbm_bp.Date, cbm_bp.LastDate;
+
+	// Добавляет к таблице данные из таблицы оргкодов
+	left join (cbm_bp) load 
+		org_code,
+		org_tb_code as cbm_bp.TBCode,
+		org_gosb_code as cbm_bp.GOSBCode,
+		org_tb_name as cbm_bp.TBName,
+		org_gosb_name as cbm_bp.GOSBName
+ 	resident org;
+	drop table org;
+
+	// Расчитывает значение перцентилей 0,75 и 0,25
+	left join(cbm_bp) load 
+		Fractile(cbm_bp.Deviations, 0.75) as cbm_bp.Percentile75,
+		Fractile(cbm_bp.Deviations, 0.25) as cbm_bp.Percentile25
+	resident cbm_bp;
+
+	// Получает значение метрики 10000062
+	temp:
+	noconcatenate load *,
+		10000062 as cbm_bp.MetricID,
+		'Прогнозное критическое невыполнение показателей БП' as cbm_bp.MetricName,
+		2 as cbm_bp.MetricDirection,
+		0 as cbm_bp.MetricPlanValue,
+		Null() as cbm_bp.ElementType, 
+		Null() as cbm_bp.ElementID,
+		'EXT_FILE' as cbm_bp.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_bp.ReportDate,
+		'STUFF' as cbm_bp.StructLevel,
+		'1) Граница боттом 25% - '&cbm_bp.Percentile25&' '&chr(13)&
+			'2) Граница топ 25% - '&cbm_bp.Percentile75&' '&chr(13)&
+			cbm_bp.Alert 
+		as cbm_bp.DevElementName,
+		cbm_bp.Deviations as cbm_bp.MetricValue,
+		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_bp.LoadID,
+		'(Факт - <b>'&cbm_bp.Deviations&
+			'</b>. Цель - меньше <b>'&cbm_bp.Percentile75&
+			'</b>. Ориентир - меньше <b>'&cbm_bp.Percentile25&'</b>)' 
+		as cbm_bp.ResultEvaluation,
+		If((cbm_bp.Deviations >= cbm_bp.Percentile75) and ((cbm_bp.Percentile25 <> 0) or (cbm_bp.Percentile75 <> 0)), 
+			1, 
+			If((cbm_bp.Deviations < cbm_bp.Percentile25),
+				13,
+				0
+			)
+		) as cbm_bp.DeviationMarker
+	resident cbm_bp;
+	drop table cbm_bp;
+	rename table temp to cbm_bp;
+
+	// Сливает данные метрики с основной таблицей
+	concatenate(cbm_data) load
+		org_code,
+		cbm_bp.TBCode as cbm.TBCode,
+		cbm_bp.GOSBCode as cbm.GOSBCode,
+		cbm_bp.TBName as cbm.TBName,
+		cbm_bp.GOSBName as cbm.GOSBName,
+		cbm_bp.MetricID as cbm.MetricID,
+		cbm_bp.MetricName as cbm.MetricName,
+		cbm_bp.MetricDirection as cbm.MetricDirection,
+		cbm_bp.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_bp.ElementType as cbm.ElementType, 
+		cbm_bp.ElementID as cbm.ElementID,
+		cbm_bp.Segment as cbm.Segment,
+		cbm_bp.ReportDate as cbm.ReportDate,
+		cbm_bp.StructLevel as cbm.StructLevel,
+		cbm_bp.DevElementName as cbm.DevElementName,
+		cbm_bp.MetricValue as cbm.MetricValue,
+		cbm_bp.ResultEvaluation as cbm.ResultEvaluation,
+		cbm_bp.DeviationMarker as cbm.DeviationMarker,
+		cbm_bp.LoadID as cbm.LoadID
+	resident cbm_bp;
+	drop table cbm_bp;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Финальный шаблон метрик
