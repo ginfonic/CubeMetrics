@@ -1328,7 +1328,6 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		org_gosb_name as cbm_trf.GOSBName
 	resident org 
 	where Len(org_code) > 2;
-	// drop table org;
 
 	// Сливает данные по оргкоду
 	temp:
@@ -1506,7 +1505,6 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		org_gosb_name as cbm_ai.GOSBName,
 		If(IsNull(org_cluster), 'Без группы', org_cluster) as cbm_ai.Cluster
  	resident org;
-	drop table org;
 
 	// Расчитывает значение перцентилей 0,75 и 0,25
 	left join(cbm_ai) load 
@@ -1582,29 +1580,31 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		//QVD
 		cbm_grm:
 		noconcatenate load
-			If(org_code = 38, 3838, org_code) as org_code,
+			org_code,
 			Num#(kpi_id) as cbm_grm.IndexID,
 			Date(Floor(MonthEnd(kpi_report_date))) as cbm_grm.Date,
 			kpi_amt_sber as cbm_grm.SBRValue,
 			kpi_amt_market as cbm_grm.MKTValue
 		from [$(grm_data_qvd)] (QVD)
-		where (kpi_id = '2141076') or (kpi_id = '1001115') or (kpi_id = '2081079') or (kpi_id = '2091156') or (kpi_id = '10003300') or
-			 (kpi_id = '10901388') or (kpi_id = '10902922') or (kpi_id = '10901073') or (kpi_id = '10902917') or (kpi_id = '10902915');
+		where (org_code <> 529052) and (org_code <> 38) and 
+			((kpi_id = '2141076') or (kpi_id = '1001115') or (kpi_id = '2081079') or (kpi_id = '2091156') or (kpi_id = '10003300') or
+			(kpi_id = '10901388') or (kpi_id = '10902922') or (kpi_id = '10901073') or (kpi_id = '10902917') or (kpi_id = '10902915'));
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	else
 		cbm_grm:
 		noconcatenate load
-			If(org_code = 38, 3838, org_code) as org_code,
+			org_code,
 			Num#(kpi_id) as cbm_grm.IndexID,
 			Date(Floor(MonthEnd(kpi_report_date))) as cbm_grm.Date,
 			kpi_amt_sber as cbm_grm.SBRValue,
 			kpi_amt_market as cbm_grm.MKTValue
 		from [$(grm_data_xl)]
 		(ooxml, embedded labels, table is Sheet1)
-		where (kpi_id = '2141076') or (kpi_id = '1001115') or (kpi_id = '2081079') or (kpi_id = '2091156') or (kpi_id = '10003300') or
-			 (kpi_id = '10901388') or (kpi_id = '10902922') or (kpi_id = '10901073') or (kpi_id = '10902917') or (kpi_id = '10902915');
+		where (org_code <> 529052) and (org_code <> 38) and 
+			((kpi_id = '2141076') or (kpi_id = '1001115') or (kpi_id = '2081079') or (kpi_id = '2091156') or (kpi_id = '10003300') or
+			(kpi_id = '10901388') or (kpi_id = '10902922') or (kpi_id = '10901073') or (kpi_id = '10902917') or (kpi_id = '10902915'));
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -1655,7 +1655,7 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	resident cbm_grm
 	group by cbm_grm.IndexID, org_code;
 
-	//Находит предыдущую даты для сравнения с последней
+	//Находит предыдущую дату для сравнения с последней
 	left join (cbm_grm) load
 		org_code,
 		cbm_grm.IndexID,
@@ -1698,16 +1698,111 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 	where (cbm_grm.Date = cbm_grm.LastDate);
 	drop table cbm_grm;
 	rename table temp to cbm_grm;
-	drop field cbm_grm.LastDate, cbm_grm.PrevDate;
-	drop field cbm_grm.SBRValue, cbm_grm.PrevSBRValue, cbm_grm.SBRShare, cbm_grm.PrevSBRShare;
-	drop field cbm_grm.MKTValue, cbm_grm.PrevMKTValue;
 
 	// Считает чмсло показателей с отрицательным ростом доли
+	// Заполняет список снижающихся долей
 	left join(cbm_grm) load
 		org_code,
-		Count(If(cbm_grm.SBRShareGrowth < 0, cbm_grm.IndexID)) as cbm_grm.NegativeGrowthCount
+		Count(If(cbm_grm.SBRShareGrowth < 0, cbm_grm.IndexID)) as cbm_grm.NegativeGrowthCount,
+		Concat(
+			If(cbm_grm.SBRShareGrowth < 0,
+				cbm_grm.Index&'. Значение - '&Num(cbm_grm.SBRShare, '$(ggffPCD)')&
+					'. Изменение '&Num(cbm_grm.SBRShareGrowth * 100, '$(ggffPPT)')&' '&cbm_grm.CompareType&
+					'. Дата - '&cbm_grm.Date
+			), 
+		Chr(13), cbm_grm.SBRShareGrowth) as cbm_grm.FallingSharesList
 	resident cbm_grm
 	group by org_code;
+
+	// Удаляет ненужные поля
+	drop field cbm_grm.LastDate, cbm_grm.PrevDate, cbm_grm.Date;
+	drop field cbm_grm.CompareType, cbm_grm.IndexID, cbm_grm.Index;
+	drop field cbm_grm.SBRValue, cbm_grm.PrevSBRValue, cbm_grm.SBRShare, cbm_grm.PrevSBRShare;
+	drop field cbm_grm.SBRShareGrowth, cbm_grm.MKTValue, cbm_grm.PrevMKTValue;
+
+	// Сливает таблицу по оргкоду и дате
+	temp:
+	noconcatenate load 
+		org_code,
+		Only(cbm_grm.NegativeGrowthCount) as cbm_grm.NegativeGrowthCount,
+		Only(cbm_grm.FallingSharesList) as cbm_grm.FallingSharesList
+	resident cbm_grm
+	group by org_code;
+	drop table cbm_grm;
+	rename table temp to cbm_grm;
+
+	// Добавляет к таблице данные из таблицы оргкодов
+	left join (cbm_grm) load 
+		org_code,
+		org_tb_code as cbm_grm.TBCode,
+		org_gosb_code as cbm_grm.GOSBCode,
+		org_tb_name as cbm_grm.TBName,
+		org_gosb_name as cbm_grm.GOSBName
+ 	resident org;
+	drop table org;
+
+	// Расчитывает значение перцентилей 0,75 и 0,25
+	left join(cbm_grm) load 
+		Fractile(cbm_grm.NegativeGrowthCount, 0.75) as cbm_grm.Percentile75,
+		Fractile(cbm_grm.NegativeGrowthCount, 0.25) as cbm_grm.Percentile25
+	resident cbm_grm;
+
+	// Получает значение метрики 10000001
+	temp:
+	noconcatenate load *,
+		10000001 as cbm_grm.MetricID,
+		'Большое количество снижающихся долей рынков ГОСБ' as cbm_grm.MetricName,
+		2 as cbm_grm.MetricDirection,
+		0 as cbm_grm.MetricPlanValue,
+		Null() as cbm_grm.ElementType, 
+		Null() as cbm_grm.ElementID,
+		'EXT_FILE' as cbm_grm.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_grm.ReportDate,
+		'STUFF' as cbm_grm.StructLevel,
+		'1) Граница боттом 25% - '&cbm_grm.Percentile25&' '&chr(13)&
+			'2) Граница топ 25% - '&cbm_grm.Percentile75&' '&chr(13)&
+			cbm_grm.FallingSharesList 
+		as cbm_grm.DevElementName,
+		cbm_grm.NegativeGrowthCount as cbm_grm.MetricValue,
+		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_grm.LoadID,
+		'(Факт - <b>'&cbm_grm.NegativeGrowthCount&
+			'</b>. Цель - меньше <b>'&cbm_grm.Percentile75&
+			'</b>. Ориентир - меньше <b>'&cbm_grm.Percentile25&'</b>)' 
+		as cbm_grm.ResultEvaluation,
+		If((cbm_grm.NegativeGrowthCount >= cbm_grm.Percentile75) and ((cbm_grm.Percentile25 <> 0) or (cbm_grm.Percentile75 <> 0)), 
+			1, 
+			If((cbm_grm.NegativeGrowthCount < cbm_grm.Percentile25),
+				13,
+				0
+			)
+		) as cbm_grm.DeviationMarker
+	resident cbm_grm;
+	drop table cbm_grm;
+	rename table temp to cbm_grm;
+
+	// Сливает данные метрики с основной таблицей
+	concatenate(cbm_data) load
+		org_code,
+		cbm_grm.TBCode as cbm.TBCode,
+		cbm_grm.GOSBCode as cbm.GOSBCode,
+		cbm_grm.TBName as cbm.TBName,
+		cbm_grm.GOSBName as cbm.GOSBName,
+		cbm_grm.MetricID as cbm.MetricID,
+		cbm_grm.MetricName as cbm.MetricName,
+		cbm_grm.MetricDirection as cbm.MetricDirection,
+		cbm_grm.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_grm.ElementType as cbm.ElementType, 
+		cbm_grm.ElementID as cbm.ElementID,
+		cbm_grm.Segment as cbm.Segment,
+		cbm_grm.ReportDate as cbm.ReportDate,
+		cbm_grm.StructLevel as cbm.StructLevel,
+		cbm_grm.DevElementName as cbm.DevElementName,
+		cbm_grm.MetricValue as cbm.MetricValue,
+		cbm_grm.ResultEvaluation as cbm.ResultEvaluation,
+		cbm_grm.DeviationMarker as cbm.DeviationMarker,
+		cbm_grm.LoadID as cbm.LoadID
+	resident cbm_grm;
+	drop table cbm_grm;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Финальный шаблон метрик
