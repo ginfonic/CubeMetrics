@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(data_dir)', '$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -37,7 +37,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, cbm_bp_qvd, cbm_bp_xl, org_qvd, org_xl)
+sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, cbm_bp_qvd, cbm_bp_xl, org_qvd, org_xl)
 	// Дата расчета
 	let v_cbmToday = Today(); //'31.07.2023';
 
@@ -1962,6 +1962,28 @@ sub cbmCreateModel(tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl
 		cbm.Category
 	resident cbm_metrics_final_lookup;
 	drop table cbm_metrics_final_lookup;
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Сохраняет данные в архив
+
+	// Дублирует основную таблицу, добавляя поле даты создания
+	cbm_data_store:
+	noconcatenate load *, Date(Floor(Today())) as cbm.CreateDate resident cbm_data;
+
+	// Добавляет к текушим данным старые из архива
+	concatenate(cbm_data_store) load *
+	from '$(data_dir)/cbm_data_store.qvd' (qvd)
+	where (cbm.CreateDate <> Date(Floor(Today())));
+	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	exit sub unless ETL_STEP_ERROR_CODE = 0;
+
+	// Сохраняет архив вместе с новыми данными на диск раз в неделю по воскресеньям
+	if WeekDay(Today()) = 7 then 
+		store cbm_data_store into '$(data_dir)/cbm_data_store.qvd' (qvd);
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+	drop table cbm_data_store;
 
 end sub;
 
