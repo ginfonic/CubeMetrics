@@ -41,11 +41,14 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	// Дата расчета
 	let v_cbmToday = Today(); //'31.07.2023';
 
+	// Сдвиг по времени
+	let c_cbmMShift = 0;
+	let c_cbmQShift = 0;
 	// Выражения расчета необходимых дат
-	set cbmGetPrevMStart = MonthStart(AddMonths('$(v_cbmToday)', -1));
-	set cbmGetPrevMEnd = MonthEnd(AddMonths('$(v_cbmToday)', -1));
-	set cbmGetPrevQStart = QuarterStart(AddMonths('$(v_cbmToday)', -3));
-	set cbmGetPrevQEnd = QuarterEnd(AddMonths('$(v_cbmToday)', -3));
+	set cbmGetPrevMStart = MonthStart(AddMonths('$(v_cbmToday)', -1 + $(c_cbmMShift)));
+	set cbmGetPrevMEnd = MonthEnd(AddMonths('$(v_cbmToday)', -1 + $(c_cbmMShift)));
+	set cbmGetPrevQStart = QuarterStart(AddMonths('$(v_cbmToday)', -3 + $(c_cbmQShift)));
+	set cbmGetPrevQEnd = QuarterEnd(AddMonths('$(v_cbmToday)', -3 + $(c_cbmQShift)));
 
 	// Таблица инициатив
 	if '$(cbmConnection)' = '1' then
