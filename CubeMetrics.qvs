@@ -1966,27 +1966,27 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	resident cbm_metrics_final_lookup;
 	drop table cbm_metrics_final_lookup;
 
-	////////////////////////////////////////////////////////////////////////////////
-	// Сохраняет данные в архив
+	// ////////////////////////////////////////////////////////////////////////////////
+	// // Сохраняет данные в архив
 
-	// Дублирует основную таблицу, добавляя поле даты создания
-	cbm_data_store:
-	noconcatenate load *, Date(Floor(Today())) as cbm.CreateDate resident cbm_data;
+	// // Дублирует основную таблицу, добавляя поле даты создания
+	// cbm_data_store:
+	// noconcatenate load *, Date(Floor(Today())) as cbm.CreateDate resident cbm_data;
 
-	// Добавляет к текушим данным старые из архива
-	concatenate(cbm_data_store) load *
-	from '$(data_dir)/cbm_data_store.qvd' (qvd)
-	where (cbm.CreateDate <> Date(Floor(Today())));
-	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	// // Добавляет к текушим данным старые из архива
+	// concatenate(cbm_data_store) load *
+	// from '$(data_dir)/cbm_data_store.qvd' (qvd)
+	// where (cbm.CreateDate <> Date(Floor(Today())));
+	// call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	// exit sub unless ETL_STEP_ERROR_CODE = 0;
 
-	// Сохраняет архив вместе с новыми данными на диск раз в неделю по воскресеньям
-	if WeekDay(Today()) = 7 then 
-		store cbm_data_store into '$(data_dir)/cbm_data_store.qvd' (qvd);
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	end if;
-	drop table cbm_data_store;
+	// // Сохраняет архив вместе с новыми данными на диск раз в неделю по воскресеньям
+	// if WeekDay(Today()) = 7 then 
+	// 	store cbm_data_store into '$(data_dir)/cbm_data_store.qvd' (qvd);
+	// 	call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+	// 	exit sub unless ETL_STEP_ERROR_CODE = 0;
+	// end if;
+	// drop table cbm_data_store;
 
 end sub;
 
