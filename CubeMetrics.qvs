@@ -1937,6 +1937,49 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	drop table cbm_bp;
 
 	////////////////////////////////////////////////////////////////////////////////
+	// Инициативы ИИ-трансформации
+	// Таблица инициатив
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_ait:
+		noconcatenate load
+			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
+			If(not(IsNull(fact_end_date)), 
+				Date(fact_end_date),
+				Date(Date#(control_date, 'DD-MM-YYYY'))
+			) as cbm_ait.Date
+		from [$(tasks_qvd)] (qvd)
+		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
+			(Upper(STATUS) = 'ЗАВЕРШЕНА') and (DIRECTION = 'ИИ-трансформация') and 
+			((title = 'Проведена дизайн-сессия') or 
+				(title = 'Разработана дорожная карта по реализации утвержденных приоритетных идей') or 
+				(title = 'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона')
+			) and ((not(IsNull(close_date)) and (close_date <> '')) or (not(IsNull(fact_end_date)) and (close_date <> '')));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		cbm_ait:
+		noconcatenate load
+			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
+			If(not(IsNull(fact_end_date)), 
+				Date(fact_end_date),
+				Date(Date#(control_date, 'DD-MM-YYYY'))
+			) as cbm_ait.Date
+		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
+		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
+			(Upper(STATUS) = 'ЗАВЕРШЕНА') and (DIRECTION = 'ИИ-трансформация') and 
+			((title = 'Проведена дизайн-сессия') or 
+				(title = 'Разработана дорожная карта по реализации утвержденных приоритетных идей') or 
+				(title = 'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона')
+			) and ((not(IsNull(close_date)) and (close_date <> '')) or (not(IsNull(fact_end_date)) and (close_date <> '')));
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+
+	////////////////////////////////////////////////////////////////////////////////
 	// Финальный шаблон метрик
 	cbm_metrics_final_lookup:
 	noconcatenate load * inline [
