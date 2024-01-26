@@ -1871,7 +1871,6 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		org_tb_name as cbm_bp.TBName,
 		org_gosb_name as cbm_bp.GOSBName
  	resident org;
-	drop table org;
 
 	// Расчитывает значение перцентилей 0,75 и 0,25
 	left join(cbm_bp) load 
@@ -1947,7 +1946,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			If(not(IsNull(fact_end_date)), 
 				Date(fact_end_date),
 				Date(Date#(control_date, 'DD-MM-YYYY'))
-			) as cbm_ait.Date
+			) as cbm_ait.Date,
+			title as cbm_ait.Title
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
 			(Upper(STATUS) = 'ЗАВЕРШЕНА') and (DIRECTION = 'ИИ-трансформация') and 
@@ -1966,7 +1966,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			If(not(IsNull(fact_end_date)), 
 				Date(fact_end_date),
 				Date(Date#(control_date, 'DD-MM-YYYY'))
-			) as cbm_ait.Date
+			) as cbm_ait.Date,
+			title as cbm_ait.Title
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
 			(Upper(STATUS) = 'ЗАВЕРШЕНА') and (DIRECTION = 'ИИ-трансформация') and 
@@ -1978,6 +1979,108 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
+
+	// Создает матрицу всех значений
+	cbm_ait_mtx:
+	noconcatenate load distinct cbm_ait.Title as title resident cbm_ait;
+	// Добавляет в матрицу оргкоды всех ГОСБ
+	join (cbm_ait_mtx) load distinct org_code resident org where not(IsNull(org_gosb_code));
+	// Добавляет матрицу в таблицу
+	concatenate (cbm_ait) load org_code, title as cbm_ait.Title resident cbm_ait_mtx;
+	drop table cbm_ait_mtx;
+
+	// Сливает таблицу по org_code, оставляя нули у отсутствующих в данных ГОСБ
+	temp:
+	noconcatenate load 
+		org_code,
+		cbm_ait.Title,
+		Date(Concat(cbm_ait.Date, '')) as cbm_ait.Date
+	resident cbm_ait
+	group by org_code, cbm_ait.Title;
+	drop table cbm_ait;
+	rename table temp to cbm_ait;
+
+	// Добавляет к таблице данные из таблицы оргкодов
+	left join (cbm_ait) load 
+		org_code,
+		org_tb_code as cbm_ait.TBCode,
+		org_gosb_code as cbm_ait.GOSBCode,
+		org_tb_name as cbm_ait.TBName,
+		org_gosb_name as cbm_ait.GOSBName
+ 	resident org;
+	drop table org;
+
+	// Получает значение метрик 10000080, 10000081, 10000082
+	temp:
+	noconcatenate load *,
+		Pick(
+			Match(cbm_ait.Title, 
+				'Проведена дизайн-сессия', 
+				'Разработана дорожная карта по реализации утвержденных приоритетных идей',
+				'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона'
+			), 10000080, 10000081, 10000082
+		) as cbm_ait.MetricID,
+		Pick(
+			Match(cbm_ait.Title, 
+				'Проведена дизайн-сессия', 
+				'Разработана дорожная карта по реализации утвержденных приоритетных идей',
+				'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона'
+			), 'Дизайн-сессия с регионом', 'Дорожная карта', 'Соглашение с регионом'
+		) as cbm_ait.MetricName,
+		1 as cbm_ait.MetricDirection,
+		1 as cbm_ait.MetricPlanValue,
+		Null() as cbm_ait.ElementType, 
+		Null() as cbm_ait.ElementID,
+		'EXT_FILE' as cbm_ait.Segment,
+		Date(Floor($(cbmGetPrevMEnd))) as cbm_ait.ReportDate,
+		'STUFF' as cbm_ait.StructLevel,
+		If(IsNull(cbm_ait.Date),
+			Pick(
+				Match(cbm_ait.Title, 
+					'Проведена дизайн-сессия', 
+					'Разработана дорожная карта по реализации утвержденных приоритетных идей',
+					'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона'
+				), 'Дизайн-сессия не проведена', 'Дорожная карта не разработана ', 'Соглашение не подписано'
+			),
+			Pick(
+				Match(cbm_ait.Title, 
+					'Проведена дизайн-сессия', 
+					'Разработана дорожная карта по реализации утвержденных приоритетных идей',
+					'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона'
+				), 'Дата проведения дизайн-сессии: ', 'Дата подписания дорожной карты: ', 'Дата подписания соглашения: '
+			)&cbm_ait.Date
+		) as cbm_ait.DevElementName,
+		If(IsNull(cbm_ait.Date), 0, 1) as cbm_ait.MetricValue,
+		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_ait.LoadID,
+		'(Событие <b>'&If(IsNull(cbm_ait.Date), 'не ', '')&'состоялось</b>)' as cbm_ait.ResultEvaluation,
+		If(IsNull(cbm_ait.Date), 1, 0) as cbm_ait.DeviationMarker
+	resident cbm_ait;
+	drop table cbm_ait;
+	rename table temp to cbm_ait;
+
+	// Сливает данные метрики с основной таблицей
+	concatenate(cbm_data) load
+		org_code,
+		cbm_ait.TBCode as cbm.TBCode,
+		cbm_ait.GOSBCode as cbm.GOSBCode,
+		cbm_ait.TBName as cbm.TBName,
+		cbm_ait.GOSBName as cbm.GOSBName,
+		cbm_ait.MetricID as cbm.MetricID,
+		cbm_ait.MetricName as cbm.MetricName,
+		cbm_ait.MetricDirection as cbm.MetricDirection,
+		cbm_ait.MetricPlanValue as cbm.MetricPlanValue,
+		cbm_ait.ElementType as cbm.ElementType, 
+		cbm_ait.ElementID as cbm.ElementID,
+		cbm_ait.Segment as cbm.Segment,
+		cbm_ait.ReportDate as cbm.ReportDate,
+		cbm_ait.StructLevel as cbm.StructLevel,
+		cbm_ait.DevElementName as cbm.DevElementName,
+		cbm_ait.MetricValue as cbm.MetricValue,
+		cbm_ait.ResultEvaluation as cbm.ResultEvaluation,
+		cbm_ait.DeviationMarker as cbm.DeviationMarker,
+		cbm_ait.LoadID as cbm.LoadID
+	resident cbm_ait;
+	drop table cbm_ait;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Финальный шаблон метрик
@@ -1999,6 +2102,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		10000050, Низ. дох. от AI, Прочее
 		10000062, Прогноз невып. БП, Прочее
 		10000001, Сниж. долей рынков, Прочее
+		10000080, Дизайн-сессия с рег., Прочее
+		10000081, Дорожная карта, Прочее
+		10000082, Соглашение с рег., Прочее
   ];
 
 	// Добавляет финальный шаблон к таблице
