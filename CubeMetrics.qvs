@@ -1980,6 +1980,22 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
+	// Множит имеющиеся записи Северного ГОСБ на все прочие ГОСБ МО
+	// Выделяет записи Северного ГОСБ
+	north_gosb:
+	noconcatenate load * resident cbm_ait where org_code = '401026';
+	// Для оставшихся трех ГОСБ МО
+	for i = 3 to 5
+		//Добавляет строки Северного ГОСБ в исходную таблицу с новым оргкодом
+		concatenate(cbm_ait) load 
+			cbm_ait.Title,
+			cbm_ait.Date,
+			40102$(i) as org_code
+		resident north_gosb;
+	next i;
+	//Удаляет таблицу Северного ГОСБ
+	drop table north_gosb;
+
 	// Создает матрицу всех значений
 	cbm_ait_mtx:
 	noconcatenate load distinct cbm_ait.Title as title resident cbm_ait;
