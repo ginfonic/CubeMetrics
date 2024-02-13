@@ -1455,7 +1455,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		// QVD
 		cbm_ai:
 		noconcatenate load
-			// iicom23.DATE,
+			// iicom23.DATE as cbm_ai.Date,
 			// iicom23.PRODUCT,
 			Sum(iicom23.COMMIS) as cbm_ai.Income,
 			// iicom23.DZO_NAME,
@@ -1463,7 +1463,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			// If(IsNull(org_code) or (org_code = ''), 99, org_code) as org_code
 		from [$(cbm_ai_qvd)] (qvd)
 		// Без ЦА и Москвы
-		where not(IsNull(org_code)) and (org_code <> '') and (org_code <> 3838)
+		where not(IsNull(org_code)) and (org_code <> '') and (org_code <> 3838) and (Year(Date(iicom23.DATE)) = Year(Today()))
 		group by org_code;
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
@@ -1474,13 +1474,13 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		noconcatenate load
 			// If((org_code = '') or (org_code = '-'), 99, org_code) as org_code,
 			org_code,
-			// iicom23.DATE,
+			// iicom23.DATE as cbm_ai.Date,
 			// iicom23.DZO_NAME,
 			// iicom23.PRODUCT,
 			Sum(iicom23.COMMIS) as cbm_ai.Income
 		from [$(cbm_ai_xl)] (ooxml, embedded labels, table is Sheet1)
 		// Без ЦА и Москвы
-		where (org_code <> '') and (org_code <> '-') and (org_code <> 3838)
+		where (org_code <> '') and (org_code <> '-') and (org_code <> 3838) and (Year(Date(iicom23.DATE)) = Year(Today()))
 		group by org_code;
 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
@@ -1573,7 +1573,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm_ai.DeviationMarker as cbm.DeviationMarker,
 		cbm_ai.LoadID as cbm.LoadID
 	resident cbm_ai;
-	drop table cbm_ai;
+	// drop table cbm_ai;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Данные долей
