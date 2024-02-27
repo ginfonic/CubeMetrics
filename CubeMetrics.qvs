@@ -1530,7 +1530,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_ai.ReportDate,
 		'STUFF' as cbm_ai.StructLevel,
 		'1) Граница боттом 25% - '&Round(cbm_ai.Percentile25, 0.01)&' руб. '&Chr(13)&
-		'2) Граница топ 25% - '&Round(cbm_ai.Percentile75, 0.01)&' руб. ' 
+		'2) Граница топ 25% - '&Round(cbm_ai.Percentile75, 0.01)&' руб. '&Chr(13)&
+		'<a href="https://infopanel.sigma.sbrf.ru/web/infopanel/dash/ai/income">Ссылка внешняя</a> '&Chr(13)&
+		'<a href="https://infopanel.omega.sbrf.ru/web/infopanel/dash/ai/income">Ссылка внутренняя</a>'
 		as cbm_ai.DevElementName,
 		cbm_ai.Income as cbm_ai.MetricValue,
 		'10000050_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_ai.LoadID,
