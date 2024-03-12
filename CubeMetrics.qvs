@@ -144,7 +144,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	cbm_metrics_lookup:
 	noconcatenate load * inline [
 		cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue
-		10000015, PL комплексных региональных проектов на текущий год, 1, 1.3
+		10000015, PL комплексных региональных проектов на текущий год, 1, 1
 		10000016, Идеи КРП со сроком жизни больше 60 календарных дней, 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
 		10000018, Достаточность КРП для выполнения плана, 1, 1
