@@ -144,7 +144,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	cbm_metrics_lookup:
 	noconcatenate load * inline [
 		cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue
-		10000015, PL комплексных региональных проектов на текущий год, 1, 1
+		10000015, PL комплексных региональных проектов на текущий год, 1, 0.5
 		10000016, Идеи КРП со сроком жизни больше 60 календарных дней, 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
 		10000018, Достаточность КРП для выполнения плана, 1, 1
@@ -226,7 +226,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	resident org;
 
 	// Ориентир, исходя из кластера ГОСБ
-	set cbmGetClusterMilestone = Pick(Match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4', 'Группа 5') + 1, 0, 4, 3, 2, 2, 1);
+	set cbmGetClusterMilestone = Pick(Match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4', 'Группа 5') + 1, 0, 2, 2, 1, 1, 1);
 
 	// Для первых 5 метрик группирует по ГОСБ с кластером и метрике в первую таблицу
 	temp1:
@@ -245,13 +245,11 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
 					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
 					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or 
-					(cbm.Status = 'Согласование ЗНИ') 
+					(cbm.Status = 'Согласование ЗНИ') or (cbm.Status = 'Черновик') 
 				) and
-				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес идеи (КРП)') or 
-					(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')
-				) and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
+				(cbm.Direction = 'КРП') and
+				(cbm.YearReport = 2024) and
+				(cbm.ControlDate < '02.02.2025'),
 				cbm.ID
 			)) /
 			$(cbmGetClusterMilestone),
@@ -547,15 +545,14 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		// Имя элемента
 		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
-			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП') or
-						(cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')
-					) and 
+			If((cbm.Direction = 'КРП') and 
 					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена') or 
 						(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
 						(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
-						(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта')
+						(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or
+						(cbm.Status = 'Черновик')
 					) and 
-					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
+					(cbm.YearReport = '2024') and (cbm.ControlDate < Date('02.02.2025')),
 				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status
 			),
 			//10000016
