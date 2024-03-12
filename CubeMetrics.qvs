@@ -298,48 +298,20 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		// Комментарий
 		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
 			//10000015
-			'1)	Количество идей КРП на текущий год: ' &
-			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
-				(cbm.Direction = 'Бизнес идеи (КРП)') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'2)	Количество КРП и PL КРП, реализуемых в текущем году: ' &
+			'1)	Количество КРП и PL КРП, реализуемых в текущем году: ' &
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
 					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
 					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
 					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or 
-					(cbm.Status = 'Согласование ЗНИ')
+					(cbm.Status = 'Согласование ЗНИ') or (cbm.Status = 'Черновик')
 				) and
 				(cbm.Direction = 'КРП') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
+				(cbm.YearReport = 2024) and
+				(cbm.ControlDate < '02.02.2025'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
-			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
-					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
-				) and
-				(cbm.Direction = 'Бизнес-эксперименты') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'4)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
-			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
-					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
-				) and
-				(cbm.Direction = 'ИИ-трансформация') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'5)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
+			'2)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
 			//10000016
 			Null(),
 			//10000017
