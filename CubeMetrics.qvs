@@ -61,6 +61,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			title as cbm.Title,
 			Date(Date#(control_date, 'DD-MM-YYYY')) as cbm.ControlDate,
 			Date(Date#(create_date, 'DD-MM-YYYY')) as cbm.CreateDate,
+			Date(Floor(fact_end_date)) as cbm.FactEndDate,
 			STATUS as cbm.Status,
 			If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
 				If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
@@ -86,6 +87,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			title as cbm.Title,
 			Date(Date#(control_date, 'DD-MM-YYYY')) as cbm.ControlDate,
 			Date(Date#(create_date, 'DD-MM-YYYY')) as cbm.CreateDate,
+			Date(Floor(fact_end_date)) as cbm.FactEndDate,
 			STATUS as cbm.Status,
 			If((Upper(STATUS) = 'ЗАВЕРШЕНА') or (Upper(STATUS) = 'ОТМЕНЕНА'), 
 				If((Upper(STATUS) = 'ОТМЕНЕНА') or (Month(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) >= 4),
@@ -114,6 +116,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			title as cbm.Title,
 			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
 			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
+			Date(Floor(fact_end_date)) as cbm.FactEndDate,
 			STATUS as cbm.Status,
 			Year(Now()) as cbm.YearReport,
 			plan_effect as cbm.PlanIncome
@@ -133,6 +136,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			title as cbm.Title,
 			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
 			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
+			Date(Floor(fact_end_date)) as cbm.FactEndDate,
 			STATUS as cbm.Status,
 			Year(Now()) as cbm.YearReport,
 			plan_effect as cbm.PlanIncome
@@ -187,6 +191,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm.YearReport,
 		cbm.ControlDate,
 		cbm.CreateDate,
+		cbm.FactEndDate,
 		cbm.Title,
 		cbm.PlanIncome
 	resident cbm_data;
@@ -303,10 +308,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			$(cbmGetClusterMilestone),
 			//10000096
 			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
 				((cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'Бизнес-эксперименты ТБ')) and
-				((cbm.YearReport = 2023) or (cbm.YearReport = 2024)) and
-				(cbm.ControlDate < '02.02.2025'),
+				((cbm.Status = 'В работе') or ((cbm.Status = 'Завершена') and (cbm.YearReport = 2024) and (cbm.FactEndDate > '01.01.2024'))),
 				cbm.ID
 			))
 		) as cbm.MetricValue,
@@ -418,10 +421,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)',
 			//10000096
 			Concat(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
 				((cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'Бизнес-эксперименты ТБ')) and
-				((cbm.YearReport = 2023) or (cbm.YearReport = 2024)) and
-				(cbm.ControlDate < '02.02.2025'),
+				((cbm.Status = 'В работе') or ((cbm.Status = 'Завершена') and (cbm.YearReport = 2024) and (cbm.FactEndDate > '01.01.2024'))),
 				cbm.Title&'. Плановый эффект - '&Num(cbm.PlanIncome, '$(ggffNUM)')&' руб.. Контрольная дата - '&cbm.ControlDate&'.'
 			), chr(13))
 		) as cbm.DevElementName
