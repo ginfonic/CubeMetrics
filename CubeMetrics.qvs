@@ -422,7 +422,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				((cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'Бизнес-эксперименты ТБ')) and
 				((cbm.YearReport = 2023) or (cbm.YearReport = 2024)) and
 				(cbm.ControlDate < '02.02.2025'),
-				cbm.Title&', плановый эффект - '&cbm.PlanIncome&'руб., контрольная дата - '&cbm.ControlDate&'.'
+				cbm.Title&'. Плановый эффект - '&Num(cbm.PlanIncome, '$(ggffNUM)')&' руб.. Контрольная дата - '&cbm.ControlDate&'.'
 			), chr(13))
 		) as cbm.DevElementName
 	resident cbm_stuff
