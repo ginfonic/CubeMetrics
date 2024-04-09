@@ -68,7 +68,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 					Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
 				), 
 				Year(Now())
-			) as cbm.YearReport
+			) as cbm.YearReport,
+			plan_effect as cbm.PlanIncome
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
@@ -92,7 +93,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 					Year(Date(Date#(Left(comment, 10), 'DD-MM-YYYY'))) - 1
 				), 
 				Year(Now())
-			) as cbm.YearReport
+			) as cbm.YearReport,
+			plan_effect as cbm.PlanIncome
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
@@ -113,7 +115,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
 			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
 			STATUS as cbm.Status,
-			Year(Now()) as cbm.YearReport
+			Year(Now()) as cbm.YearReport,
+			plan_effect as cbm.PlanIncome
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
@@ -131,7 +134,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
 			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
 			STATUS as cbm.Status,
-			Year(Now()) as cbm.YearReport
+			Year(Now()) as cbm.YearReport,
+			plan_effect as cbm.PlanIncome
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
@@ -150,6 +154,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		10000018, Достаточность КРП для выполнения плана, 1, 1
 		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
 		10000020, Низкое количество идей КРП на ГОСБ, 1, 0
+		10000096, Бизнес-эксперименты, 1, 1
   ];
 
 	// Добавляет метрики к таблице инициатив
@@ -181,7 +186,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm.Direction,
 		cbm.YearReport,
 		cbm.ControlDate,
-		cbm.CreateDate
+		cbm.CreateDate,
+		cbm.Title,
+		cbm.PlanIncome
 	resident cbm_data;
 
 	// Загружает таблицу оргкодов
@@ -238,7 +245,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm.MetricDirection, 
 		cbm.MetricPlanValue, 
 		// Значение метрики
-		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
+		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000096),
 			//10000015
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
@@ -293,10 +300,18 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				((cbm.ControlDate >= '02.02.2024') and (cbm.ControlDate < '02.02.2025')),
 				cbm.ID
 			)) /
-			$(cbmGetClusterMilestone)
+			$(cbmGetClusterMilestone),
+			//10000096
+			Count(If(
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'Бизнес-эксперименты ТБ')) and
+				((cbm.YearReport = 2023) or (cbm.YearReport = 2024)) and
+				(cbm.ControlDate < '02.02.2025'),
+				cbm.ID
+			))
 		) as cbm.MetricValue,
 		// Комментарий
-		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
+		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000096),
 			//10000015
 			'1)	Количество КРП и PL КРП, реализуемых в текущем году: ' &
 			Count(If(
@@ -400,7 +415,15 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'5)	Ориентир КРП на текущий год: ' & 
-			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)'
+			$(cbmGetClusterMilestone) & ' шт. (считаем, что план на следующий год равен текущему)',
+			//10000096
+			Concat(If(
+				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе')) and
+				((cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'Бизнес-эксперименты ТБ')) and
+				((cbm.YearReport = 2023) or (cbm.YearReport = 2024)) and
+				(cbm.ControlDate < '02.02.2025'),
+				cbm.Title&', плановый эффект - '&cbm.PlanIncome&'руб., контрольная дата - '&cbm.ControlDate&'.'
+			), chr(13))
 		) as cbm.DevElementName
 	resident cbm_stuff
 	where not(IsNull(org_gosb_code)) and (cbm.MetricID <> 10000020)
@@ -579,7 +602,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			((cbm.MetricID = 10000017) and (cbm.MetricValue > cbm.MetricPlanValue)) or 
 			((cbm.MetricID = 10000018) and (cbm.MetricValue >= cbm.MetricPlanValue)) or 
 			((cbm.MetricID = 10000019) and (cbm.MetricValue >= cbm.MetricPlanValue)) or
-			(cbm.MetricID = 10000020)
+			(cbm.MetricID = 10000020) or
+			((cbm.MetricID = 10000096) and (cbm.MetricValue >= cbm.MetricPlanValue))
 		)
 	)
 	group by cbm.MetricID;
@@ -598,7 +622,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		) as cbm.LoadID, 
 		// Рассчитывает поле DEVIATION_MARKER
 		If(not $(ggffIsEmpty(cbm.MetricValue)),
-			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020), 
+			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020, 10000096), 
 				// 10000015
 				If((cbm.MetricValue < cbm.MetricPlanValue), 
 					1, 
@@ -640,12 +664,20 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 						1,
 						0
 					)
+				),
+				// 10000096
+				If((cbm.MetricValue < cbm.MetricPlanValue), 
+					1, 
+					If((cbm.MetricValue > cbm.Percentile75),
+						13,
+						0
+					)
 				)
 			)
 		) as cbm.DeviationMarker,
 		// Оценка результата
 		If(not $(ggffIsEmpty(cbm.MetricValue)),
-			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020),		
+			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020, 10000096),		
 				// 10000015
 				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
 				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
@@ -668,6 +700,10 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				// 10000020
 				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
 				'</b>. Цель - больше <b>'&Num(cbm.Percentile25, '$(ggffPCT)')&
+				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)',
+				// 10000096
+				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
+				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
 				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)'
 			)
 		) as cbm.ResultEvaluation
