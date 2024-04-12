@@ -1032,7 +1032,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	//Добавляет данные ориентира
 	left join(cbm_fbs_10000021) load
     org_code,
-		Sum(If(Year('$(v_cbmToday)') = 2023, "4 кв", 0)) as cbm_fbs.Milestone
+		Sum(If(Year('$(v_cbmToday)') = 2024, "2024q4", 0)) as cbm_fbs.Milestone
 		// Sum(Pick(Match($(ggffQuarterNo('$(v_cbmToday)'))&Year('$(v_cbmToday)'), '32023', '42023', '12024') + 1,
 		// 	0, "2 кв", "3 кв", "4 кв"
 		// )) as cbm_fbs.Milestone
