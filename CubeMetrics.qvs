@@ -430,7 +430,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	where not(IsNull(org_gosb_code)) and (cbm.MetricID <> 10000020)
 	group by org_code, org_cluster, cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue;
 
-	// Для шестой метрики группирует по ТБ во вторую таблицу
+	// Для метрики 10000020 группирует по ТБ во вторую таблицу
 	temp2:
 	noconcatenate load
 		org_tb_code, 
@@ -476,7 +476,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	where not(IsNull(org_tb_code)) and (cbm.MetricID = 10000020)
 	group by org_tb_code, cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue;
 	drop table cbm_stuff;
-	rename table temp1 to cbm_stuff;
+	rename table temp2 to cbm_stuff;
 
 	// Сливает обе таблицы в готовую таблицу команды
 	concatenate(cbm_stuff) load
@@ -486,9 +486,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm.MetricDirection, 
 		cbm.MetricPlanValue,
 		cbm.MetricValue,
-		cbm.DevElementName
-	resident temp2;
-	drop table temp2;
+		If(cbm.DevElementName = '', '-', cbm.DevElementName) as cbm.DevElementName
+	resident temp1;
+	drop table temp1;
 
 	// Создает матрицу ТБ/ГОСБ
 	cbm_mtx:
@@ -2115,6 +2115,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		10000018, Дост. КРП для вып. плана, Проекты
 		10000019, PL КРП на след. год, Проекты
 		10000020, Низкое кол-во идей КРП, Проекты
+		10000096, Бизнес-эксперименты, Проекты
 		10000021, Дост. PL продаж, Полка
 		10000022, Неравн. плана продаж, Полка
 		10000023, Низкая доход. продаж, Полка
