@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(data_dir)', '$(qvd_dir)/db_task.qvd', '$(data_dir)/rmx_tasks.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(data_dir)', '$(qvd_dir)/db_task.qvd', '$(data_dir)/db_task.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -1274,9 +1274,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			'</b>. Ориентир - доля больше <b>'&Num(cbm_fbs.PenetrationPercentile50, '$(ggffPCD)')&
 			'</b> и прирост доли за кв. больше <b>'&Num(cbm_fbs.PenetrationGrowthPercentile50 * 100, '$(ggffPPT)')&'</b>)'
 		as cbm_fbs.ResultEvaluation,
-		If((cbm_fbs.Penetration > cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth > cbm_fbs.PenetrationGrowthPercentile50), 
+		If((cbm_fbs.Penetration >= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth > cbm_fbs.PenetrationGrowthPercentile50), 
 			13, 
-			If((cbm_fbs.Penetration <= cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50) and 
+			If((cbm_fbs.Penetration < cbm_fbs.PenetrationPercentile50) and (cbm_fbs.PenetrationGrowth <= cbm_fbs.PenetrationGrowthPercentile50) and 
 				((cbm_fbs.PenetrationPercentile50 <> 0) or (cbm_fbs.PenetrationGrowthPercentile50 <> 0)),
 				1,
 				0
