@@ -148,6 +148,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
+	// Получает значение MetricPlanValue в зависимости от даты расчета
+	set cbmGet10000018MetricPlanValue = Pick(Match(Year(Now())&Num(Month(Now())), '20245', '20246') + 1, 1, 0.5, 0.5);
+
 	// Шаблон метрик
 	cbm_metrics_lookup:
 	noconcatenate load * inline [
@@ -155,11 +158,21 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		10000015, PL комплексных региональных проектов на текущий год, 1, 0.5
 		10000016, Идеи КРП со сроком жизни больше 60 календарных дней, 2, 0
 		10000017, Доля нереализованных идей КРП, 2, 0
-		10000018, Достаточность КРП для выполнения плана, 1, 1
+		10000018, Достаточность КРП для выполнения плана, 1, 
 		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
 		10000020, Низкое количество идей КРП на ГОСБ, 1, 0
 		10000096, Бизнес-эксперименты, 1, 1
   ];
+
+	// Меняет значение MetricPlanValue на расчитаное
+	temp:
+	noconcatenate load
+		cbm.MetricID, cbm.MetricName, cbm.MetricDirection,
+		$(cbmGet10000018MetricPlanValue) as cbm.MetricPlanValue
+	resident cbm_metrics_lookup
+	where cbm.MetricID = '10000018';
+	drop table cbm_metrics_lookup;
+	rename table temp to cbm_metrics_lookup;
 
 	// Добавляет метрики к таблице инициатив
 	join(cbm_data) load * 
@@ -288,9 +301,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
 					(cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')
 				) and
-				((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
+				(cbm.Direction = 'КРП') and (cbm.YearReport = 2024) and (cbm.ControlDate < '02.02.2025'),
 				cbm.ID
 			)) /
 			$(cbmGetClusterMilestone),
@@ -339,51 +350,19 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			Count(If(
 				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
 				(cbm.Direction = 'КРП') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
+				(cbm.YearReport = 2024) and
+				(cbm.ControlDate < '02.02.2025'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
 			'2)	Количество КРП, завершенных в текущем году: ' &
 			Count(If(
 				(cbm.Status = 'Завершена') and
 				(cbm.Direction = 'КРП') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
+				(cbm.YearReport = 2024) and
+				(cbm.ControlDate < '02.02.2025'),
 				cbm.ID
 			)) & ' шт. '& chr(13) &
-			'3)	Количество бизнес-экспериментов, реализуемых в текущем году: ' &
-			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
-				(cbm.Direction = 'Бизнес-эксперименты') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'4)	Количество бизнес-экспериментов, завершенных в текущем году: ' &
-			Count(If(
-				(cbm.Status = 'Завершена') and
-				(cbm.Direction = 'Бизнес-эксперименты') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'5)	Количество ИИ-трансформаций, реализуемых в текущем году: ' &
-			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
-				(cbm.Direction = 'ИИ-трансформация') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'6)	Количество ИИ-трансформаций, завершенных в текущем году: ' &
-			Count(If(
-				(cbm.Status = 'Завершена') and
-				(cbm.Direction = 'ИИ-трансформация') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'7)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
+			'3)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
 			//10000019
 			'1)	Количество идей КРП на следующий год: ' &
 			Count(If(
@@ -561,9 +540,9 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
 				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
 			//10000018
-			If(((cbm.Direction = 'КРП') or (cbm.Direction = 'Бизнес-эксперименты') or (cbm.Direction = 'ИИ-трансформация')) and 
-					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена')) and 
-					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
+			If((cbm.Direction = 'КРП') and 
+					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and 
+					(cbm.YearReport = '2024') and (cbm.ControlDate < Date('02.02.2025')),
 				cbm.Direction & ': '& cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
 			//10000019
 			If(((cbm.Direction = 'Бизнес идеи (КРП)') or (cbm.Direction = 'КРП') or 
