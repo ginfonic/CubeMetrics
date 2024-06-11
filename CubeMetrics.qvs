@@ -2,7 +2,7 @@
 //Сохраняет модель данных в QVD
 sub cbmStoreModel(data_dir, qvd_dir, refs_dir, target, use_db)
 	let cbmConnection = use_db;
-	call cbmCreateModel('$(data_dir)', '$(qvd_dir)/db_task.qvd', '$(data_dir)/db_task.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
+	call cbmCreateModel('$(data_dir)', '$(qvd_dir)/db_task.qvd', '$(data_dir)/db_task.xlsx', '$(qvd_dir)/db_ubasket.qvd', '$(data_dir)/fbs_data.xlsx', '$(qvd_dir)/db_products.qvd', '$(data_dir)/ptb_prd.xlsx', '$(data_dir)/fbs_milestone.xlsx', '$(qvd_dir)/db_q_monitors.qvd', '$(data_dir)/trf_data.xlsx', '$(qvd_dir)/db_prbr_users.qvd', '$(data_dir)/db_prbr_users.xlsx', '$(qvd_dir)/hr.qvd', '$(data_dir)/trf_hr.xlsx', '$(qvd_dir)/IIcom23.qvd', '$(data_dir)/cbm_ai.xlsx', '$(qvd_dir)/sberbank_market_shares.qvd', '$(data_dir)/grm_data.xlsx', '$(qvd_dir)/db_qlik_sysreact.qvd', '$(data_dir)/cbm_bp.xlsx', '$(qvd_dir)/r.org.qvd', '$(refs_dir)/r.org.xlsx');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
 	call storeTemp('cbm_data', target&'_data');
 	exit sub unless ETL_STEP_ERROR_CODE = 0;
@@ -37,7 +37,7 @@ sub cbmMergeMetric(metric_code)
 end sub;
 
 //Создает модель данных
-sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, cbm_bp_qvd, cbm_bp_xl, org_qvd, org_xl)
+sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, fbs_prd_xl, fbs_mls_xl, trf_qvd, trf_xl, trf_users_qvd, trf_users_xl, trf_hr_qvd, trf_hr_xl, cbm_ai_qvd, cbm_ai_xl, grm_data_qvd, grm_data_xl, cbm_bp_qvd, cbm_bp_xl, org_qvd, org_xl)
 	// Дата расчета
 	let v_cbmToday = Today(); //'31.07.2023';
 
@@ -105,49 +105,6 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
-	// Таблица отмененных инициатив
-	if '$(cbmConnection)' = '1' then
-		//QVD
-		cbm_data_cancel:
-		noconcatenate load
-			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			id as cbm.ID,
-			DIRECTION as cbm.Direction,
-			title as cbm.Title,
-			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
-			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
-			Date(Floor(fact_end_date)) as cbm.FactEndDate,
-			STATUS as cbm.Status,
-			Year(Now()) as cbm.YearReport,
-			plan_effect as cbm.PlanIncome
-		from [$(tasks_qvd)] (qvd)
-		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
-			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	else 
-		//Excel
-		cbm_data_cancel:
-		noconcatenate load
-			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			id as cbm.ID,
-			DIRECTION as cbm.Direction,
-			title as cbm.Title,
-			Date(Date#(control_date, 'DD-MM-YYYY') ) as cbm.ControlDate,
-			Date(Date#(create_date, 'DD-MM-YYYY') ) as cbm.CreateDate,
-			Date(Floor(fact_end_date)) as cbm.FactEndDate,
-			STATUS as cbm.Status,
-			Year(Now()) as cbm.YearReport,
-			plan_effect as cbm.PlanIncome
-		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
-		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
-			(Upper(STATUS) = 'ОТМЕНЕНА') and (DIRECTION = 'Бизнес идеи (КРП)');
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	end if;
-
 	// Получает значение MetricPlanValue в зависимости от даты расчета
 	set cbmGet10000018MetricPlanValue = Pick(Match(Year(Now())&Num(Month(Now())), '20245', '20246') + 1, 1, 0.5, 0.5);
 
@@ -155,9 +112,6 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	cbm_metrics_lookup:
 	noconcatenate load * inline [
 		cbm.MetricID, cbm.MetricName, cbm.MetricDirection, cbm.MetricPlanValue
-		10000015, PL комплексных региональных проектов на текущий год, 1, 0.5
-		10000016, Идеи КРП со сроком жизни больше 60 календарных дней, 2, 0
-		10000017, Доля нереализованных идей КРП, 2, 0
 		10000018, Достаточность КРП для выполнения плана, 1, 
 		10000019, PL комплексных региональных проектов на следующий год, 1, 0.7
 		10000020, Низкое количество идей КРП на ГОСБ, 1, 0
@@ -167,27 +121,18 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	// Меняет значение MetricPlanValue на расчитаное
 	temp:
 	noconcatenate load
-		cbm.MetricID, cbm.MetricName, cbm.MetricDirection,
-		$(cbmGet10000018MetricPlanValue) as cbm.MetricPlanValue
-	resident cbm_metrics_lookup
-	where cbm.MetricID = '10000018';
+		cbm.MetricID, 
+		cbm.MetricName, 
+		cbm.MetricDirection,
+		If(cbm.MetricID = '10000018', 
+			$(cbmGet10000018MetricPlanValue), 
+			cbm.MetricPlanValue
+		) as cbm.MetricPlanValue
+	resident cbm_metrics_lookup;
 	drop table cbm_metrics_lookup;
 	rename table temp to cbm_metrics_lookup;
-
 	// Добавляет метрики к таблице инициатив
-	join(cbm_data) load * 
-	resident cbm_metrics_lookup
-	where cbm.MetricID <> 10000017;
-
-	// Добавляет метрики к таблице отмененных инициатив
-	join(cbm_data_cancel) load * 
-	resident cbm_metrics_lookup
-	where cbm.MetricID = 10000017;
-
-	// Сливает таблицу отмененных инициатив с таблицей инициатив
-	concatenate(cbm_data) load *
-	resident cbm_data_cancel;
-	drop table cbm_data_cancel;
+	join(cbm_data) load * resident cbm_metrics_lookup;
 
 	// Создает таблицу команды из таблицы инициатив
 	cbm_stuff:
@@ -263,39 +208,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm.MetricDirection, 
 		cbm.MetricPlanValue, 
 		// Значение метрики
-		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000096),
-			//10000015
-			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
-					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
-					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
-					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or 
-					(cbm.Status = 'Согласование ЗНИ') or (cbm.Status = 'Черновик') 
-				) and
-				(cbm.Direction = 'КРП') and
-				(cbm.YearReport = 2024) and
-				(cbm.ControlDate < '02.02.2025'),
-				cbm.ID
-			)) /
-			$(cbmGetClusterMilestone),
-			//10000016
-			Count(If(
-				((cbm.Status = 'В работе') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and
-				(cbm.Direction = 'Бизнес идеи (КРП)') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024') and 
-				(cbm.CreateDate < Date('$(v_cbmToday)' - 60)),
-				cbm.ID
-			)),
-			//10000017
-			Count(If(
-				(cbm.Status = 'Отменена') and
-				(cbm.Direction = 'Бизнес идеи (КРП)') and
-				(cbm.YearReport = 2023) and
-				(cbm.ControlDate < '02.02.2024'),
-				cbm.ID
-			)) /
-			$(cbmGetClusterMilestone),
+		Pick(Match(cbm.MetricID, 10000018, 10000019, 10000096),
 			//10000018
 			Count(If(
 				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
@@ -325,26 +238,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			))
 		) as cbm.MetricValue,
 		// Комментарий
-		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000096),
-			//10000015
-			'1)	Количество КРП и PL КРП, реализуемых в текущем году: ' &
-			Count(If(
-				((cbm.Status = 'Завершена') or (cbm.Status = 'В работе') or 
-					(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
-					(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
-					(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or 
-					(cbm.Status = 'Согласование ЗНИ') or (cbm.Status = 'Черновик')
-				) and
-				(cbm.Direction = 'КРП') and
-				(cbm.YearReport = 2024) and
-				(cbm.ControlDate < '02.02.2025'),
-				cbm.ID
-			)) & ' шт. '& chr(13) &
-			'2)	Ориентир КРП на текущий год: ' & $(cbmGetClusterMilestone) &' шт.',
-			//10000016
-			Null(),
-			//10000017
-			Null(),
+		Pick(Match(cbm.MetricID, 10000018, 10000019, 10000096),
 			//10000018
 			'1)	Количество КРП, реализуемых в текущем году: ' &
 			Count(If(
@@ -471,10 +365,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 
 	// Создает матрицу ТБ/ГОСБ
 	cbm_mtx:
-	noconcatenate load 
-		org_code
-	resident org
-	where not IsNull(org_tb_code);
+	noconcatenate load org_code resident org where not IsNull(org_tb_code);
 
 	// Добавляет к матрице метрики
 	join(cbm_mtx) load 
@@ -518,27 +409,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm.MetricPlanValue, 
 		'ELEMENT' as cbm.StructLevel,
 		// Имя элемента
-		Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019),
-			//10000015
-			If((cbm.Direction = 'КРП') and 
-					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена') or 
-						(cbm.Status = 'Бизнес экспертиза') or (cbm.Status = 'Бизнес экспертиза завершена') or 
-						(cbm.Status = 'Финансовая экспертиза') or (cbm.Status = 'Финансовая экспертиза завершена') or 
-						(cbm.Status = 'Согласование проекта на РГ') or (cbm.Status = 'Согласование закрытия проекта') or
-						(cbm.Status = 'Черновик')
-					) and 
-					(cbm.YearReport = '2024') and (cbm.ControlDate < Date('02.02.2025')),
-				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status
-			),
-			//10000016
-			If((cbm.Direction = 'Бизнес идеи (КРП)') and (cbm.Status = 'В работе') and 
-					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')) and 
-					(cbm.CreateDate < Date('$(v_cbmToday)' - 60)),
-				cbm.Title & ', дата создания: ' & cbm.CreateDate & ' (в ожидании ' & ('$(v_cbmToday)' - cbm.CreateDate) & ' дн.)'),
-			//10000017
-			If((cbm.Direction = 'Бизнес идеи (КРП)') and (cbm.Status = 'Отменена') and 
-					(cbm.YearReport = '2023') and (cbm.ControlDate < Date('02.02.2024')),
-				cbm.Direction & ': ' & cbm.Title & ', срок: ' & cbm.ControlDate & ', статус: ' & cbm.Status),
+		Pick(Match(cbm.MetricID, 10000018, 10000019),
 			//10000018
 			If((cbm.Direction = 'КРП') and 
 					((cbm.Status = 'В работе') or (cbm.Status = 'Завершена') or (cbm.Status = 'Согласование закрытия проекта') or (cbm.Status = 'Согласование ЗНИ')) and 
@@ -564,9 +435,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	resident cbm_stuff;
 
 	// Сливает таблицу команды с таблицей инициатив
-	concatenate(cbm_data) load *, 
-		'STUFF' as cbm.StructLevel
-	resident cbm_stuff;
+	concatenate(cbm_data) load *, 'STUFF' as cbm.StructLevel resident cbm_stuff;
 	drop table cbm_stuff;
 
 	// Расчитывает значение перцентилей 0,75 и 0,25
@@ -602,25 +471,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		) as cbm.LoadID, 
 		// Рассчитывает поле DEVIATION_MARKER
 		If(not $(ggffIsEmpty(cbm.MetricValue)),
-			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020, 10000096), 
-				// 10000015
-				If((cbm.MetricValue < cbm.MetricPlanValue), 
-					1, 
-					If((cbm.MetricValue > cbm.Percentile75),
-						13,
-						0
-					)
-				),
-				// 10000016
-				If((cbm.MetricValue > cbm.MetricPlanValue), 1, 0), 
-				// 10000017
-				If(cbm.MetricValue = cbm.MetricPlanValue, 
-					13, 
-					If((cbm.MetricValue > cbm.Percentile75),
-						1,
-						0
-					)
-				),
+			Pick(Match(cbm.MetricID, 10000018, 10000019, 10000020, 10000096), 
 				// 10000018
 				If((cbm.MetricValue < cbm.MetricPlanValue), 
 					1, 
@@ -657,18 +508,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		) as cbm.DeviationMarker,
 		// Оценка результата
 		If(not $(ggffIsEmpty(cbm.MetricValue)),
-			Pick(Match(cbm.MetricID, 10000015, 10000016, 10000017, 10000018, 10000019, 10000020, 10000096),		
-				// 10000015
-				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
-				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
-				'</b>. Ориентир - больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&'</b>)',
-				// 10000016
-				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffNUM)')&
-				' шт.</b> Цель - не больше <b>'&Num(cbm.MetricPlanValue, '$(ggffNUM)')&' шт.</b>)',
-				// 10000017
-				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
-				'</b>. Цель - не больше <b>'&Num(cbm.Percentile75, '$(ggffPCT)')&
-				'</b>. Ориентир - <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&'</b>)',
+			Pick(Match(cbm.MetricID, 10000018, 10000019, 10000020, 10000096),		
 				// 10000018
 				'(Факт - <b>'&Num(cbm.MetricValue, '$(ggffPCT)')&
 				'</b>. Цель - не меньше <b>'&Num(cbm.MetricPlanValue, '$(ggffPCT)')&
@@ -1271,18 +1111,54 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Данные о посещаемости
+	// Возвращает второе значение кода ГОСБ, если первое не определено или неверно
+	set cbmGOSBCoalesce = If(IsNull($1) or ($1 = '') or ($1 = '-') or ($1 = 0) or ($1 = 8558) or ($1 = 1806), $2, $1);
 
-	// Получает данные о посещаемости
+	//Получает таблицу активных пользователей ПРБР: упров и регдиров
 	if '$(cbmConnection)' = '1' then
 		//QVD
 		cbm_trf:
+		noconcatenate load *,
+			$(ggffCreateOrgCode(tb_code_1, gosb_code_1)) as org_code;
 		noconcatenate load
-			// Date(Floor(dates)) as cbm_trf.Date,
-			// title as cbm_trf.Role,
-			duration as cbm_trf.Duration,
-			$(ggffCreateOrgCode(tb_code, gosb_code)) as org_code
+			sber_id as cbm_trf.SberID,
+			role_id as cbm_trf.RoleID,
+			sudir_tb as tb_code_1,
+			$(cbmGOSBCoalesce(sudir_gosb, gosb_code)) as gosb_code_1,
+			Coalesce(ft_id, 0) as cbm_trf.FtID_1
+		from [$(trf_users_qvd)] (qvd)
+		where (enabled = 1) and ((role_id = 14) or (role_id = 35)) and (sudir_gosb <> 9052);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	else
+		//Excel
+		cbm_trf:
+		noconcatenate load *,
+			$(ggffCreateOrgCode(tb_code_1, gosb_code_1)) as org_code;
+		noconcatenate load
+			sber_id as cbm_trf.SberID,
+			role_id as cbm_trf.RoleID,
+			sudir_tb as tb_code_1,
+			$(cbmGOSBCoalesce(sudir_gosb, gosb_code)) as gosb_code_1,
+			Coalesce(ft_id, 0) as cbm_trf.FtID_1
+		from [$(trf_users_xl)] (ooxml, embedded labels, table is Sheet1)
+		where (enabled = 1) and ((role_id = 14) or (role_id = 35)) and (sudir_gosb <> 9052);
+
+		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
+		exit sub unless ETL_STEP_ERROR_CODE = 0;
+	end if;
+	drop fields tb_code_1, gosb_code_1;
+
+	// Получает данные о посещаемости упров и регдиров
+	if '$(cbmConnection)' = '1' then
+		//QVD
+		cbm_trf_data:
+		noconcatenate load
+			sber_id as cbm_trf_data.SberID,
+			duration as cbm_trf_data.Duration
 		from [$(trf_qvd)] (qvd)
-		where (title = 'Управляющий ГОСБ') and 
+		where ((title = 'Управляющий ГОСБ') or (title = 'Региональный директор')) and 
 			(Date(Floor(dates)) >= Date(Floor($(cbmGetPrevMStart)))) and 
 			(Date(Floor(dates)) <= Date(Floor($(cbmGetPrevMEnd))));
 
@@ -1290,14 +1166,12 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	else
 		//Excel
-		cbm_trf:
+		cbm_trf_data:
 		noconcatenate load
-			// Date(Floor(dates)) as cbm_trf.Date,
-			// title as cbm_trf.Role,
-			duration as cbm_trf.Duration,
-			$(ggffCreateOrgCode(tb_code, gosb_code)) as org_code
+			sber_id as cbm_trf_data.SberID,
+			duration as cbm_trf_data.Duration
 		from [$(trf_xl)] (ooxml, embedded labels, table is Sheet1)
-		where (title = 'Управляющий ГОСБ') and 
+		where ((title = 'Управляющий ГОСБ') or (title = 'Региональный директор')) and 
 			(Date(Floor(dates)) >= Date(Floor($(cbmGetPrevMStart)))) and 
 			(Date(Floor(dates)) <= Date(Floor($(cbmGetPrevMEnd))));
 
@@ -1305,8 +1179,15 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
 
+	// Добавляет данные о посещаемости в основную таблицу 
+	left join(cbm_trf) load
+		cbm_trf_data.SberID as cbm_trf.SberID,
+		cbm_trf_data.Duration as cbm_trf.Duration
+	resident cbm_trf_data;
+	drop table cbm_trf_data;
+
 	// Добавляет к таблице данные из таблицы оргкодов
-	right join(cbm_trf) load
+	left join(cbm_trf) load
 		org_code,
 		org_tb_code as cbm_trf.TBCode,
 		org_gosb_code as cbm_trf.GOSBCode,
@@ -1315,17 +1196,20 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	resident org 
 	where Len(org_code) > 2;
 
-	// Сливает данные по оргкоду
+	// Сливает данные по оргкоду, роли и сбер-айди
 	temp:
 	noconcatenate load
 		org_code,
-		cbm_trf.TBCode,
-		cbm_trf.GOSBCode,
-		cbm_trf.TBName,
-		cbm_trf.GOSBName,
+		cbm_trf.FtID_1,
+		Only(cbm_trf.RoleID) as cbm_trf.RoleID,
+		Only(cbm_trf.SberID) as cbm_trf.SberID,
+		Only(cbm_trf.TBCode) as cbm_trf.TBCode,
+		Only(cbm_trf.GOSBCode) as cbm_trf.GOSBCode,
+		Only(cbm_trf.TBName) as cbm_trf.TBName,
+		Only(cbm_trf.GOSBName) as cbm_trf.GOSBName,
 		Sum(cbm_trf.Duration) as cbm_trf.Duration
 	resident cbm_trf
-	group by org_code, cbm_trf.TBCode, cbm_trf.GOSBCode, cbm_trf.TBName, cbm_trf.GOSBName;
+	group by org_code, cbm_trf.FtID_1;
 	drop table cbm_trf;
 	rename table temp to cbm_trf;
 
@@ -1334,50 +1218,12 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		Fractile(cbm_trf.Duration, 0.75) as cbm_trf.Percentile75
 	resident cbm_trf;
 
-	//Получает таблицу управляющих из данных HR
-	if '$(cbmConnection)' = '1' then
-		//QVD
-		cbm_trf_hr:
-		noconcatenate load
-			org_code,
-			// Определяет, активен ли Управляющий ГОСБ
-			("Таб. номер" <> -1) as cbm_trf_hr.IsActive
-		from [$(trf_hr_qvd)] (qvd)
-		//Загружает только Управляющих, не Председателей
-		where not(IsNull(org_code)) and (org_code <> '') and (Len(org_code) > 2);
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	else
-		//Excel
-		cbm_trf_hr:
-		noconcatenate load
-			org_code,
-			// Определяет, активен ли управляющий ГОСБ
-			("Таб. номер" <> -1) as cbm_trf_hr.IsActive
-		from [$(trf_hr_xl)] (ooxml, embedded labels, table is Sheet1)
-		//Загружает только Управляющих, не Председателей
-		where (org_code <> '') and (org_code <> '-') and (Len(org_code) > 2);
-
-		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
-		exit sub unless ETL_STEP_ERROR_CODE = 0;
-	end if;
-
-	// Добавляет в таблицу посещаемости данные об активности управляющих
-	left join(cbm_trf) load
-		org_code,
-		cbm_trf_hr.IsActive as cbm_trf.IsActive
-	resident cbm_trf_hr;
-	drop table cbm_trf_hr;
-
 	// Получает значение метрики
 	temp:
 	noconcatenate load *,
-		'(Факт - <b>'&Interval(cbm_trf.MetricValue/(3600*24),'h:mm:ss')&'. Цель - больше 0'&
-			'</b>. Ориентир - больше <b>'&Interval(cbm_trf.Percentile75/(3600*24),'h:mm:ss')&'</b>)' 
-		as cbm_trf.ResultEvaluation;
-	noconcatenate load *,
-		10000035 as cbm_trf.MetricID,
+		If(cbm_trf.RoleID = 14, 10000035, 20000018) as cbm_trf.MetricID,
+		// Передает айди ФТ только для Регдиректоров
+		If(cbm_trf.RoleID = 35, cbm_trf.FtID_1) as cbm_trf.FtID,
 		'Посещаемость платформы ПРБР' as cbm_trf.MetricName,
 		1 as cbm_trf.MetricDirection,
 		0 as cbm_trf.MetricPlanValue,
@@ -1385,23 +1231,25 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		Null() as cbm_trf.ElementID,
 		'EXT_FILE' as cbm_trf.Segment,
 		Date(Floor($(cbmGetPrevMEnd))) as cbm_trf.ReportDate,
-		If(cbm_trf.IsActive, 'STUFF', 'NODATA') as cbm_trf.StructLevel,
-		'https://sudirvpo.sigma.sbrf.ru/vpo-sp-qs/extensions/Infopanel/Infopanel.html?page=td&td_page=gf_other/trafcbm_monitor&org_code='&org_code as cbm_trf.DevElementName,
-		If(cbm_trf.IsActive, cbm_trf.Duration, 0) as cbm_trf.MetricValue,
-		// If(cbm_trf.IsActive, Interval(cbm_trf.Duration/(3600*24),'h:mm:ss')) as cbm_trf.MetricValue,
-		// Interval(cbm_trf.Duration/(3600*24),'h:mm:ss') as cbm_trf.MetricValue,
-		'10000035_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD') as cbm_trf.LoadID,
-		If(cbm_trf.IsActive, 
-			If((cbm_trf.Duration > cbm_trf.Percentile75), 
-				13, 
-				If((cbm_trf.Duration <= 0),
-					1,
-					0
-				)
-			),
-			// Если нет управляющего
-			0
-		) as cbm_trf.DeviationMarker
+		'STUFF' as cbm_trf.StructLevel,
+		'<a href="https://infopanel.sigma.sbrf.ru/web/infopanel/dash/prbr-admittance/prbr-admittance-table">Внешняя ссылка. </a>'&
+			'<a href="https://infopanel.omega.sbrf.ru/web/infopanel/dash/prbr-admittance/prbr-admittance-table">Внутренняя ссылка.</a>' 
+		as cbm_trf.DevElementName,
+		cbm_trf.Duration as cbm_trf.MetricValue,
+		If(cbm_trf.RoleID = 14, 		
+			'10000035_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD'),
+			'20000018_'&Date($(cbmGetPrevMStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevMEnd), 'YYYYMMDD') 
+		) as cbm_trf.LoadID,
+		If((cbm_trf.Duration > cbm_trf.Percentile75), 
+			13, 
+			If((cbm_trf.Duration <= 0),
+				1,
+				0
+			)
+		) as cbm_trf.DeviationMarker,
+		'(Факт - <b>'&Interval(cbm_trf.Duration/(3600*24),'h:mm:ss')&'. Цель - больше 0'&
+			'</b>. Ориентир - больше <b>'&Interval(cbm_trf.Percentile75/(3600*24),'h:mm:ss')&'</b>)' 
+		as cbm_trf.ResultEvaluation
 	resident cbm_trf;
 	drop table cbm_trf;
 	rename table temp to cbm_trf;
@@ -1426,7 +1274,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm_trf.MetricValue as cbm.MetricValue,
 		cbm_trf.ResultEvaluation as cbm.ResultEvaluation,
 		cbm_trf.DeviationMarker as cbm.DeviationMarker,
-		cbm_trf.LoadID as cbm.LoadID
+		cbm_trf.LoadID as cbm.LoadID,
+		cbm_trf.FtID as cbm.FtID
 	resident cbm_trf;
 	drop table cbm_trf;
 
@@ -1558,7 +1407,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		cbm_ai.DeviationMarker as cbm.DeviationMarker,
 		cbm_ai.LoadID as cbm.LoadID
 	resident cbm_ai;
-	// drop table cbm_ai;
+	drop table cbm_ai;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Данные долей
@@ -1880,7 +1729,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 			cbm_bp.Alert 
 		as cbm_bp.DevElementName,
 		cbm_bp.Deviations as cbm_bp.MetricValue,
-		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_bp.LoadID,
+		'10000062_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_bp.LoadID,
 		'(Факт - <b>'&cbm_bp.Deviations&
 			'</b>. Цель - меньше <b>'&cbm_bp.Percentile25&
 			'</b>. Ориентир - меньше <b>'&cbm_bp.Percentile75&'</b>)' 
@@ -2028,6 +1877,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	// Получает значение метрик 10000080, 10000081, 10000082
 	temp:
 	noconcatenate load *,
+			cbm_ait.MetricID&'_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_ait.LoadID;
+	noconcatenate load *,
 		Pick(
 			Match(cbm_ait.Title, 
 				'Проведена дизайн-сессия', 
@@ -2067,7 +1918,6 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		) & If(cbm_ait.DoubleControlDate <> cbm_ait.ControlDate, '. Был изменен срок выполнения задачи', '') 
 		as cbm_ait.DevElementName,
 		If($(cbmIs80thMetricFailed), 0, 1) as cbm_ait.MetricValue,
-		'10000001_'&Date($(cbmGetPrevQStart), 'YYYYMMDD')&'_'&Date($(cbmGetPrevQEnd), 'YYYYMMDD') as cbm_ait.LoadID,
 		'(Отклонение <b>'&If($(cbmIs80thMetricFailed), '', 'не ')&'зафиксировано</b>)' as cbm_ait.ResultEvaluation,
 		If($(cbmIs80thMetricFailed), 1, 0) as cbm_ait.DeviationMarker
 	resident cbm_ait;
@@ -2122,6 +1972,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		10000080, Дизайн-сессия с рег., Прочее
 		10000081, Дорожная карта, Прочее
 		10000082, Соглашение с рег., Прочее
+		20000018, Посещ. платф. ПРБР, Прочее
   ];
 
 	// Добавляет финальный шаблон к таблице
