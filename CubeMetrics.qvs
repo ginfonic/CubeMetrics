@@ -1059,7 +1059,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	cbm_fbs_10000025:
 	noconcatenate load * resident cbm_fbs;
 
-	// Расчитывает значение перцентилей 0,5
+	// Расчитывает значение перцентиля 0,5
 	left join(cbm_fbs_10000025) load 
 		cbm_fbs.Cluster,
 		Fractile(cbm_fbs.Penetration, 0.5) as cbm_fbs.PenetrationPercentile50,
@@ -1953,9 +1953,6 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	cbm_metrics_final_lookup:
 	noconcatenate load * inline [
 		cbm.MetricID, cbm.MetricShortName, cbm.Category
-		10000015, PL КРП на тек. год, Проекты
-		10000016, Идеи КРП > 60 дн., Проекты
-		10000017, Доля нереал. идей КРП, Проекты
 		10000018, Дост. КРП для вып. плана, Проекты
 		10000019, PL КРП на след. год, Проекты
 		10000020, Низкое кол-во идей КРП, Проекты
