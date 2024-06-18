@@ -1771,54 +1771,55 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Инициативы ИИ-трансформации
-	// Таблица инициатив
 	if '$(cbmConnection)' = '1' then
 		//QVD
-		cbm_ait:
-		noconcatenate load
-			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			Date(Date#(control_date, 'DD-MM-YYYY')) as cbm_ait.ControlDate,
-			Date(Date#(double_control_date, 'DD-MM-YYYY')) as cbm_ait.DoubleControlDate,
-			If(IsNull(fact_end_date) or (fact_end_date = '') or (fact_end_date = '-'), 
-				Date(Date#(Left(comment, 10), 'DD-MM-YYYY')),
-				Date(fact_end_date)
-			) as cbm_ait.FactEndDate,
-			STATUS as cbm_ait.Status,
-			title as cbm_ait.Title
-		from [$(tasks_qvd)] (qvd)
-		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
-			(Upper(STATUS) <> 'ОТМЕНЕНА') and (DIRECTION = 'ИИ-трансформация') and 
-			((title = 'Проведена дизайн-сессия') or 
-				(title = 'Разработана дорожная карта по реализации утвержденных приоритетных идей') or 
-				(title = 'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона')
-			);
-
+		cbm_ait_org:
+		noconcatenate load * from [$(tasks_qvd)] (qvd);
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	else
 		//Excel
-		cbm_ait:
-		noconcatenate load
-			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
-			Date(Date#(control_date, 'DD-MM-YYYY')) as cbm_ait.ControlDate,
-			Date(Date#(double_control_date, 'DD-MM-YYYY')) as cbm_ait.DoubleControlDate,
-			If(IsNull(fact_end_date) or (fact_end_date = '') or (fact_end_date = '-'), 
-				Date(Date#(Left(comment, 10), 'DD-MM-YYYY')),
-				Date(fact_end_date)
-			) as cbm_ait.FactEndDate,
-			STATUS as cbm_ait.Status,
-			title as cbm_ait.Title
-		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
-		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
-			(Upper(STATUS) <> 'ОТМЕНЕНА') and (DIRECTION = 'ИИ-трансформация') and 
-			((title = 'Проведена дизайн-сессия') or 
-				(title = 'Разработана дорожная карта по реализации утвержденных приоритетных идей') or 
-				(title = 'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона')
-			);
-
+		cbm_ait_org:
+		noconcatenate load * from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1);
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
+
+	// Таблица родителей
+	cbm_ait_parent:
+	noconcatenate load id as parent_id
+	resident cbm_ait_org
+	where (parent_id = 0) and (DIRECTION = 'ИИ-трансформация');
+
+	// Добавляет таблицу родителей к оригинальной
+	left join(cbm_ait_org) load
+		parent_id,
+		// Флаг наличия родительской задачи
+		1 as is_matched
+	resident cbm_ait_parent;
+	drop table cbm_ait_parent;
+
+	// Таблица инициатив
+	cbm_ait:
+	noconcatenate load
+		tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
+		Date(Date#(control_date, 'DD-MM-YYYY')) as cbm_ait.ControlDate,
+		Date(Date#(double_control_date, 'DD-MM-YYYY')) as cbm_ait.DoubleControlDate,
+		If(IsNull(fact_end_date) or (fact_end_date = '') or (fact_end_date = '-'), 
+			Date(Date#(Left(comment, 10), 'DD-MM-YYYY')),
+			Date(fact_end_date)
+		) as cbm_ait.FactEndDate,
+		STATUS as cbm_ait.Status,
+		title as cbm_ait.Title
+	resident cbm_ait_org
+	where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id <> 0) and 
+		(Upper(STATUS) <> 'ОТМЕНЕНА') and (DIRECTION = 'ИИ-трансформация') and not(IsNull(is_matched)) and 
+		((title = 'Проведена дизайн-сессия') or 
+			(title = 'Разработана дорожная карта по реализации утвержденных приоритетных идей') or 
+			(title = 'Подписано соглашение или доп.соглашение по ИИ-трансформации на уровне руководства банка и региона')
+		);
+	drop table cbm_ait_org;
+
 	// Множит имеющиеся записи Северного ГОСБ на все прочие ГОСБ МО
 	// Выделяет записи Северного ГОСБ
 	north_gosb:
