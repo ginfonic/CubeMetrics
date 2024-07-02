@@ -54,8 +54,12 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	if '$(cbmConnection)' = '1' then
 		//QVD
 		cbm_data:
+		noconcatenate load *,
+			tb_code&If(not(IsNull(multi_gosb)), multi_gosb, If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code))) as org_code
+		where multi_gosb <> '';
 		noconcatenate load
-			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
+			tb_code,
+			gosb_code,
 			id as cbm.ID,
 			If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as cbm.Direction,
 			title as cbm.Title,
@@ -70,7 +74,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				), 
 				Year(Now())
 			) as cbm.YearReport,
-			plan_effect as cbm.PlanIncome
+			plan_effect as cbm.PlanIncome,
+			Trim(SubField(gosb_mult, ';')) as multi_gosb
 		from [$(tasks_qvd)] (qvd)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
@@ -80,8 +85,12 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	else
 		//Excel
 		cbm_data:
+		noconcatenate load *,
+			tb_code&If(not(IsNull(multi_gosb)), multi_gosb, If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code))) as org_code
+		where multi_gosb <> '';
 		noconcatenate load
-			tb_code&If(gosb_code = 0, '', If(gosb_code = 3838, 38, gosb_code)) as org_code,
+			tb_code,
+			gosb_code,
 			id as cbm.ID,
 			If((id = 3193) or (id = 2001), 'Региональные проекты', DIRECTION) as cbm.Direction,
 			title as cbm.Title,
@@ -96,7 +105,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 				), 
 				Year(Now())
 			) as cbm.YearReport,
-			plan_effect as cbm.PlanIncome
+			plan_effect as cbm.PlanIncome,
+			Trim(SubField(gosb_mult, ';')) as multi_gosb
 		from [$(tasks_xl)] (ooxml, embedded labels, table is Sheet1)
 		where (tb_code <> 38) and (gosb_code <> 9052) and (parent_id = 0) and 
 			((Upper(STATUS) <> 'ОТМЕНЕНА') or ((Upper(STATUS) = 'ОТМЕНЕНА') and (cause = '3')));
@@ -104,7 +114,8 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 		call setStepError('$(#ScriptError)', '$(ScriptError)', ScriptErrorDetails);
 		exit sub unless ETL_STEP_ERROR_CODE = 0;
 	end if;
-
+	drop fields tb_code, gosb_code, multi_gosb;
+	
 	// Получает значение MetricPlanValue в зависимости от даты расчета
 	set cbmGet10000018MetricPlanValue = Pick(Match(Year(Now())&Num(Month(Now())), '20245', '20246') + 1, 1, 0.5, 0.5);
 
@@ -198,7 +209,7 @@ sub cbmCreateModel(data_dir, tasks_qvd, tasks_xl, fbs_qvd, fbs_xl, fbs_prd_qvd, 
 	// Ориентир, исходя из кластера ГОСБ
 	set cbmGetClusterMilestone = Pick(Match(org_cluster, 'Группа 1', 'Группа 2', 'Группа 3', 'Группа 4', 'Группа 5') + 1, 0, 2, 2, 1, 1, 1);
 
-	// Для первых 5 метрик группирует по ГОСБ с кластером и метрике в первую таблицу
+	// Для метрик кроме 10000020 группирует по ГОСБ с кластером и метрике в первую таблицу
 	temp1:
 	noconcatenate load
 		org_code, 
